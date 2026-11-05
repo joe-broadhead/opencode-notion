@@ -62,7 +62,8 @@ These are denied by the plugin's default rules, and OpenCode hides them: `notion
 
 When the user asks for one, say it is off, and that the user can add a later `ask` rule in the agent's own `permissions`,
 such as `{ "action": "notion_notion-delete-pages", "resource": "*", "effect": "ask" }`: each call then asks. Don't edit
-their configuration yourself. Offer the app step that does the same thing: Trash or version history in Notion, or the
+their configuration yourself. If a delete is turned on, it needs `user_confirmed` true: say what will be trashed, and that
+Trash is recoverable only until the workspace's retention passes. Offer the app step that does the same thing: Trash or version history in Notion, or the
 agent's own screen. Never work around the deny, and never suggest `allow` or "Always allow".
 
 ## Decisions and content are the user's
