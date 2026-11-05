@@ -1,0 +1,509 @@
+{
+  "name": "@joe-broadhead/opencode-notion",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Unofficial OpenCode plugin for Notion: search, read and edit your workspace's pages, databases and comments through Notion's official MCP server",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "notion"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joe-broadhead/opencode-notion.git"
+  },
+  "homepage": "https://github.com/joe-broadhead/opencode-notion#readme",
+  "bugs": {
+    "url": "https://github.com/joe-broadhead/opencode-notion/issues"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./tui": "./dist/tui.js"
+  },
+  "files": [
+    "dist",
+    "assets/icon.svg",
+    "skills",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "opencode": {
+    "host": ">=2.2.3 <2.3.0"
+  },
+  "scripts": {
+    "check": "node scripts/check.mjs",
+    "typecheck": "node scripts/check.mjs typecheck",
+    "build": "node scripts/check.mjs build",
+    "test": "node scripts/check.mjs unit",
+    "test:host": "node scripts/check.mjs host",
+    "test:pack": "node scripts/check.mjs pack",
+    "lint": "node scripts/check.mjs forbidden"
+  },
+  "devDependencies": {
+    "@opencode/client": "2.2.3",
+    "@opencode/plugin": "2.2.3",
+    "@opencode/sdk": "2.2.3",
+    "@opentui/core": "0.8.0",
+    "@opentui/solid": "0.8.0",
+    "@types/bun": "1.4.4",
+    "@types/node": "24.19.2",
+    "esbuild": "0.28.2",
+    "solid-js": "1.9.17",
+    "typescript": "5.9.3"
+  },
+  "jelly": {
+    "title": "Notion",
+    "summary": "Your Notion pages, databases, comments and meeting notes.",
+    "icon": "assets/icon.svg",
+    "tools": [
+      {
+        "name": "notion.notion-ai-search",
+        "permission": "notion_notion-ai-search",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-calendar-list-calendar-resources",
+        "permission": "notion_notion-calendar-list-calendar-resources",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-calendar-list-calendars",
+        "permission": "notion_notion-calendar-list-calendars",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-calendar-list-contacts",
+        "permission": "notion_notion-calendar-list-contacts",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-calendar-list-coworkers-events",
+        "permission": "notion_notion-calendar-list-coworkers-events",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-calendar-list-events",
+        "permission": "notion_notion-calendar-list-events",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-connector-search",
+        "permission": "notion_notion-connector-search",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-download-attachment",
+        "permission": "notion_notion-download-attachment",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-download-skill",
+        "permission": "notion_notion-download-skill",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-fetch",
+        "permission": "notion_notion-fetch",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-get-async-task",
+        "permission": "notion_notion-get-async-task",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-get-comments",
+        "permission": "notion_notion-get-comments",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-get-enabled-skills",
+        "permission": "notion_notion-get-enabled-skills",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-get-file-download-urls",
+        "permission": "notion_notion-get-file-download-urls",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-get-groups",
+        "permission": "notion_notion-get-groups",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-get-self",
+        "permission": "notion_notion-get-self",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-get-session-status",
+        "permission": "notion_notion-get-session-status",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-get-suggested-edit",
+        "permission": "notion_notion-get-suggested-edit",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-get-teams",
+        "permission": "notion_notion-get-teams",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-get-tool-access",
+        "permission": "notion_notion-get-tool-access",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-get-users",
+        "permission": "notion_notion-get-users",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-get-version-changes",
+        "permission": "notion_notion-get-version-changes",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-list-favorite-pages",
+        "permission": "notion_notion-list-favorite-pages",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-list-page-backlinks",
+        "permission": "notion_notion-list-page-backlinks",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-list-private-pages",
+        "permission": "notion_notion-list-private-pages",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-list-recent-pages",
+        "permission": "notion_notion-list-recent-pages",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-list-session-events",
+        "permission": "notion_notion-list-session-events",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-list-shared-pages",
+        "permission": "notion_notion-list-shared-pages",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-memory-search",
+        "permission": "notion_notion-memory-search",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-query-data-sources",
+        "permission": "notion_notion-query-data-sources",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-query-meeting-notes",
+        "permission": "notion_notion-query-meeting-notes",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-query-multiple-data-sources",
+        "permission": "notion_notion-query-multiple-data-sources",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-query-sessions",
+        "permission": "notion_notion-query-sessions",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-read-session-event",
+        "permission": "notion_notion-read-session-event",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-search",
+        "permission": "notion_notion-search",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-search-agents",
+        "permission": "notion_notion-search-agents",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-search-sessions",
+        "permission": "notion_notion-search-sessions",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-view-version",
+        "permission": "notion_notion-view-version",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-wait-session",
+        "permission": "notion_notion-wait-session",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-calendar-create-events",
+        "permission": "notion_notion-calendar-create-events",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-calendar-update-events",
+        "permission": "notion_notion-calendar-update-events",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-convert-page-to-skill",
+        "permission": "notion_notion-convert-page-to-skill",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-create-attachment",
+        "permission": "notion_notion-create-attachment",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-create-comment",
+        "permission": "notion_notion-create-comment",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-create-database",
+        "permission": "notion_notion-create-database",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-create-file-upload",
+        "permission": "notion_notion-create-file-upload",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-create-folder",
+        "permission": "notion_notion-create-folder",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-create-pages",
+        "permission": "notion_notion-create-pages",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-create-suggested-edit",
+        "permission": "notion_notion-create-suggested-edit",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-create-view",
+        "permission": "notion_notion-create-view",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-duplicate-page",
+        "permission": "notion_notion-duplicate-page",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-move-pages",
+        "permission": "notion_notion-move-pages",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-resolve-suggested-edit",
+        "permission": "notion_notion-resolve-suggested-edit",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-restore-pages",
+        "permission": "notion_notion-restore-pages",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-set-comment-reaction",
+        "permission": "notion_notion-set-comment-reaction",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-set-discussion-resolved",
+        "permission": "notion_notion-set-discussion-resolved",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-update-comment",
+        "permission": "notion_notion-update-comment",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-update-data-source",
+        "permission": "notion_notion-update-data-source",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-update-enabled-skills",
+        "permission": "notion_notion-update-enabled-skills",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-update-folder",
+        "permission": "notion_notion-update-folder",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-update-page",
+        "permission": "notion_notion-update-page",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-update-view",
+        "permission": "notion_notion-update-view",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-calendar-cancel-events",
+        "permission": "notion_notion-calendar-cancel-events",
+        "effect": "deny",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-delete-comment",
+        "permission": "notion_notion-delete-comment",
+        "effect": "deny",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-delete-databases",
+        "permission": "notion_notion-delete-databases",
+        "effect": "deny",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-delete-pages",
+        "permission": "notion_notion-delete-pages",
+        "effect": "deny",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-restore-version",
+        "permission": "notion_notion-restore-version",
+        "effect": "deny",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-send-message-to-session",
+        "permission": "notion_notion-send-message-to-session",
+        "effect": "deny",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-spawn-session",
+        "permission": "notion_notion-spawn-session",
+        "effect": "deny",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-stop-session",
+        "permission": "notion_notion-stop-session",
+        "effect": "deny",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-upload-skill",
+        "permission": "notion_notion-upload-skill",
+        "effect": "deny",
+        "readOnly": false
+      }
+    ],
+    "skills": [
+      "notion",
+      "notion-write"
+    ],
+    "rpc": [],
+    "views": [],
+    "signIns": [
+      {
+        "id": "notion",
+        "label": "Notion",
+        "server": "notion"
+      }
+    ],
+    "contributes": {
+      "homeFeeds": [],
+      "homeWidgets": [],
+      "workKinds": [],
+      "settings": []
+    }
+  }
+}
