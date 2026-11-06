@@ -48,8 +48,8 @@ From a terminal, run `opencode mcp auth notion` instead; it opens the link autom
 sign-in.
 
 Notion issues a refresh token that it rotates on every use, and revoking or reusing one ends the whole sign-in. OpenCode
-refreshes its own token as it goes; when it cannot, `/connect` marks the Notion account as needing a new sign-in, and
-OpenCode shows its "MCP server needs authentication" notice.
+refreshes its own token as it goes; when it cannot, OpenCode asks for a new sign-in, and `/connect` marks the account while
+it is still listed. OpenCode also shows its "MCP server needs authentication" notice.
 
 To sign out, or to switch workspace, run `opencode mcp logout notion`, or remove the account in `/connect` → Notion. Then
 sign in again. To sign out before you remove the plugin, see [Uninstall](#uninstall).
@@ -141,6 +141,16 @@ The plugin adds these rules to every agent, directly after the agent's base rule
 So reads run, and the 23 write tools ask before they run. Each change reaches people: everyone with access to the page or
 database; colleagues a comment mentions, who are notified; the people whose access changes when a page moves; and the
 attendees a calendar event may notify. `notion-write` says so before each call.
+
+**A permission rule matches a tool's name, not its arguments.** `notion-update-page` is the commonest change and stays at
+`ask`, although it also carries `replace_content`, which replaces a page's whole body. No rule can tell the two apart, so
+the guard is `notion-write`'s: edit through `update_content` with text copied from a fetch, and never send
+`replace_content` unless the user explicitly asked to replace the whole page. Read the input shown in the permission
+prompt before you answer yes. To remove that path entirely, deny the tool, in your own `permissions` or an agent's:
+
+```json
+{ "permissions": [{ "action": "notion_notion-update-page", "resource": "*", "effect": "deny" }] }
+```
 
 The tool names are double-prefixed, because Notion's own names start `notion-`: `notion-search` becomes
 `notion_notion-search`, and in Code Mode `tools["notion"]["notion-search"]`.
@@ -235,6 +245,9 @@ A script's errors from the tools RPC have their own codes, listed in
 
 ## Known limits
 
+- **The permission prompt is the only guard for a whole-page replacement.** A rule matches the tool name, not its
+  arguments, so `notion-update-page` asks the same way for a property edit and for `replace_content`, which replaces the
+  page's body. Read the input in the prompt before saying yes, or deny the tool as [Permissions](#permissions) shows.
 - **The tool table comes from Notion's documentation.** Notion publishes no input schemas and names only three
   annotations, and this release has not been reconciled with a live tool list. A tool Notion adds, or changes to change
   data, can run here as a read until a release knows it. `CONTRIBUTING.md` has the check that reconciles the list.

@@ -40,6 +40,20 @@ describe("docs", () => {
     expect(text(file)).not.toMatch(/provisional|not yet (?:checked|published|signed)|private package|TODO/i)
   })
 
+  // D1: the guard is text, not a rule, and the README says why where a stranger reads the permissions.
+  test("the README says a rule cannot see an argument, and gives the deny that removes the whole-page path", () => {
+    const readme = text("README.md")
+    expect(readme).toContain("A permission rule matches a tool's name, not its arguments")
+    expect(readme).toContain("`notion-update-page` is the commonest change and stays at `ask`")
+    expect(readme).toContain("Read the input shown in the permission prompt before you answer yes")
+    expect(readme).toContain('{ "permissions": [{ "action": "notion_notion-update-page", "resource": "*", "effect": "deny" }] }')
+    expect(readme).toContain("The permission prompt is the only guard for a whole-page replacement")
+  })
+
+  test("the README's sign-in says the account is marked only while it is still listed", () => {
+    expect(text("README.md")).toContain("OpenCode asks for a new sign-in, and `/connect` marks the account while it is still listed")
+  })
+
   test("the README names no version of the plugin, not even in an example", () => {
     expect(text("README.md")).not.toMatch(/opencode-notion@\d|\b0\.\d+\.\d+\b|\bv\d+\.\d+\.\d+\b/)
   })
