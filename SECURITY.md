@@ -53,8 +53,8 @@ What the model can do in Notion is limited by these layers, in this order:
    `src/notion-tools.ts`, which run without a prompt. The nine tools above are denied, and hidden from the model. Some
    changes that ask still reach people: a comment's mention notifies a colleague, a moved page changes who can see it, and
    a calendar event may notify its attendees.
-3. **Your OpenCode permissions.** Your `permissions` rules and saved "Always allow" answers override the default rules. A
-   `deny` you configure always wins.
+3. **Your OpenCode permissions.** Your `permissions` rules come after the plugin's. A saved "Always allow" beats an
+   `ask` but never a `deny`, so it cannot reopen one of the nine.
 
 Things to know:
 

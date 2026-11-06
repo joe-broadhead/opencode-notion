@@ -4,9 +4,10 @@ export const SERVER_NAME = "notion"
 /** The name `/connect` shows for the server's sign-in. */
 export const DISPLAY_NAME = "Notion"
 /**
- * Notion's MCP server. Write it nowhere else: the pack test points the built plugin at a fake by replacing it. No
- * `oauth` block goes with it: Notion's challenge names its one scope, `default`, and OpenCode requests it as given, so
- * the pinned client ID metadata document is used and nothing is registered.
+ * Notion's MCP server. Write it nowhere else: the pack test points the built plugin at a fake by replacing it.
+ * `serverConfig` pins `oauth.scope` to `default`: a challenge that names no scope makes OpenCode request every scope in
+ * the metadata, `ema_issuer:manage` included, and the pin does not disable the client metadata document, so nothing is
+ * registered.
  */
 export const ENDPOINT = "https://mcp.notion.com/mcp"
 /**

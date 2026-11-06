@@ -211,18 +211,9 @@ Never replace a whole page from OpenCode, in any agent (a `deny` also hides the 
 [{ "action": "notion_notion-update-page", "resource": "*", "effect": "deny" }]
 ```
 
-Run one write tool without a prompt in the build agent (answering "Always allow" once does the same, for every agent in the
-project):
-
-```json
-{
-  "agents": {
-    "build": {
-      "permissions": [{ "action": "notion_notion-create-comment", "resource": "*", "effect": "allow" }]
-    }
-  }
-}
-```
+No write tool gets an `allow` recipe here, and none should be saved: an "Always allow" answer covers every agent in the
+project, and it is exactly what lets a change that reaches other people run unasked. In an unattended run such as
+`opencode run`, a write that asks is refused, so run writes interactively, where the permission prompt is the yes.
 
 A strict agent where every Notion tool asks, reads included: put these in that agent's own `permissions`, after the block.
 The last match wins, so the `notion_*` ask alone would turn the denied tools into asks too; repeating their denies after it

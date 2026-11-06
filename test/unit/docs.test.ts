@@ -102,7 +102,7 @@ describe("docs", () => {
   })
 
   test("the docs sign in only with OAuth, or with a workspace owner's MCP token held in an env var, never a pasted key", () => {
-    expect(text("README.md")).toContain("No integration token or API key is needed or used.")
+    expect(text("README.md")).toContain("No integration token is needed for the browser sign-in; a headless machine can use an MCP token")
     expect(text("docs/configuration.md")).toContain("Notion's server signs in with OAuth")
     expect(text("docs/configuration.md")).toContain('"Authorization": "Bearer {env:NOTION_MCP_TOKEN}"')
     for (const file of FILES) expect(text(file)).not.toMatch(/Bearer (?!\{env:)[A-Za-z0-9_-]{8,}|NOTION_API_KEY/)
@@ -120,6 +120,21 @@ describe("docs", () => {
   })
 
   // Once the plugin is removed and OpenCode reloads, `mcp logout notion` finds no server: sign out first.
+  // DR-2, AB-6: an allow for a write is never advised, in any doc or skill, not only for the nine denies.
+  test("no doc or skill advises an allow for a write tool", () => {
+    for (const name of WRITE_TOOLS) {
+      const allow = rule(name, "allow")
+      for (const file of FILES) expect({ file, name, allow: text(file).includes(allow) }).toEqual({ file, name, allow: false })
+    }
+    // The advice that replaces the old recipe: writes run interactively, where the prompt is the yes.
+    expect(text("docs/configuration.md")).toContain("run writes interactively, where the permission prompt is the yes")
+  })
+
+  // DR-3: a saved approval can beat an ask, never a configured deny.
+  test("the README and SECURITY say a saved Always allow never beats a deny", () => {
+    for (const file of ["README.md", "SECURITY.md"]) expect(text(file)).toContain("beats an `ask` but never a `deny`")
+  })
+
   test("the README's Uninstall signs out before it removes the plugin", () => {
     const uninstall = /## Uninstall(.*?)## Links/.exec(text("README.md"))?.[1] ?? ""
     const logout = uninstall.indexOf("opencode mcp logout notion")

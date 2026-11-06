@@ -40,9 +40,10 @@ version does not update: remove the `@version` from its `plugins` entry first.
 ## Sign in
 
 Run `/connect` and choose **Notion** (it is listed under MCP). In the terminal UI, press `o` or Enter to open the link to
-Notion's sign-in page in your browser, sign in, and choose the workspace to connect. The plugin asks Notion for its one scope, `default`, so there is no
-access level to choose; the permission rules below narrow what the model may do. No integration token or API key is
-needed or used.
+Notion's sign-in page in your browser, sign in, and choose the workspace to connect. The plugin asks Notion for its one
+scope, `default`, so there is no access level to choose; the permission rules below narrow what the model may do. No
+integration token is needed for the browser sign-in; a headless machine can use an MCP token, as [Configure](#configure)
+shows.
 
 From a terminal, run `opencode mcp auth notion` instead; it opens the link automatically. `/mcps` also offers the same
 sign-in.
@@ -155,9 +156,9 @@ prompt before you answer yes. To remove that path entirely, deny the tool, in yo
 The tool names are double-prefixed, because Notion's own names start `notion-`: `notion-search` becomes
 `notion_notion-search`, and in Code Mode `tools["notion"]["notion-search"]`.
 
-Everything that comes later than these rules still wins: an agent's own stricter rules (Explore cannot use Notion), your
-`permissions` in `opencode.json`, and your saved "Always allow" answers. In an unattended run such as `opencode run`, a
-tool that asks is refused.
+Everything that comes later than these rules still wins: an agent's own stricter rules (Explore cannot use Notion) and
+your `permissions` in `opencode.json`. A saved "Always allow" beats an `ask` but never a `deny`. In an unattended run such
+as `opencode run`, a tool that asks is refused.
 
 Agents that exist only in your own config, and agents added by plugins that load later, are created after the plugin adds
 its rules, so Notion tools run there without asking. `/notion-status` and `/notion` name those agents and show the default
