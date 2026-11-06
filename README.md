@@ -17,7 +17,7 @@ Unofficial; not affiliated with Notion.
 - An Enterprise workspace can restrict AI apps to an approved list. If yours does, an admin adds OpenCode first.
 - Notion stores workspace data in the United States, unless your Enterprise workspace has been migrated to another
   region.
-- The 71 tools, and which of them read and write, come from Notion's own documentation. This release has not been
+- The tool table, and which tools read and write, comes from Notion's own documentation. This release has not been
   reconciled with a live tool list, so treat a tool's class as Notion's description of it, not as its annotation.
 
 ## Install
@@ -136,7 +136,7 @@ The plugin adds these rules to every agent, directly after the agent's base rule
    Not in the top-level `permissions`: a top-level rule reaches every agent, Explore included. Never make a denied tool
    `allow`, and don't answer "Always allow" for it: that would save an allow for every agent in the project.
 
-So reads run, and the 23 changes ask before they run. Each change reaches people: everyone with access to the page or
+So reads run, and the 23 write tools ask before they run. Each change reaches people: everyone with access to the page or
 database; colleagues a comment mentions, who are notified; the people whose access changes when a page moves; and the
 attendees a calendar event may notify. `notion-write` says so before each call.
 

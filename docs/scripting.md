@@ -83,7 +83,7 @@ a connection can be limited while under its own cap. Querying a data source has 
 
 Make calls one at a time, never in parallel. When Notion reports `rate_limited`, the method fails with `UPSTREAM_ERROR` and
 the message carries `retry_after_seconds`: wait that long, then make fewer calls at once, and never retry in a loop. Notion
-retries a rate limit once itself when the wait is two seconds or less.
+answers 429 or 529 with that body, and retries a rate limit once itself when the wait is two seconds or less.
 
 A 503 (`service_overload`) on a write can mean the write was saved. Read the object before repeating it: never retry a
 write that returned 503 before reading the object.

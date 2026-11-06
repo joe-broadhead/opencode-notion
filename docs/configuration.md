@@ -326,9 +326,9 @@ holds no token, no header and no URL query, and makes no Notion call. `version`,
 | `problems` | Setup problems, each `CODE: What happened. Next step: What to do.` |
 | `nextStep` | Exactly one next step: the `Next step` row, `Nothing to do.` when nothing is needed |
 
-The `Access` row states the posture the default rules fix, from the tool lists: "reads run without asking; the 23 changes
-and any new tool ask first; the 9 that delete, replace a whole page, upload a Skill, drive a Notion agent or cancel an
-event are off". Then it says whether that connection is a person's or a workspace connection's, when an account read has
+The `Access` row states the posture the default rules fix, from the tool lists: reads run without asking; every change and
+any new tool ask first; and the tools that delete, replace a whole page, upload a Skill, drive a Notion agent or cancel an
+event are off. Then it says whether that connection is a person's or a workspace connection's, when an account read has
 said so, and whether those rules are in place: "no agent runs new Notion tools unasked", "default rules missing in the
 agents listed below", or "default rules not added (see the OpenCode row)".
 
