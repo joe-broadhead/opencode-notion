@@ -318,6 +318,12 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     await fake?.close()
   }, 60_000)
 
+  test("status makes no Notion call", async () => {
+    const from = fake.calls.length
+    await status()
+    expect(fake.calls.slice(from)).toEqual([])
+  })
+
   test("describes exactly the known reads, each available with its live schema", async () => {
     const { value } = await script("describe", {})
     expect(value.id).toBe(TOOLS_RPC_ID)

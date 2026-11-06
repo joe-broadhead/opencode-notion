@@ -6,9 +6,19 @@ import { VERSION } from "../../src/version.js"
 import { DENY_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
 import { allow } from "./fake.js"
 
-const SIGN_IN = "Run /connect and choose Notion, then press o or Enter to open the link (in a terminal, opencode mcp auth notion opens it automatically)."
+const SIGN_IN = "Run /connect and choose Notion, then press o or Enter to open the link (in a terminal, opencode mcp auth notion opens it automatically: run it from the project folder where the plugin is installed, and if it answers MCP server not found: notion, wait a few seconds and run it again)."
+
+describe("the sign-in and sign-out caveat", () => {
+  test("both next steps say where to run the command, and what the cold-start answer means", () => {
+    expect(SIGN_IN).toContain("run it from the project folder where the plugin is installed")
+    expect(SIGN_IN).toContain("MCP server not found: notion")
+    expect(REVOKED).toContain("from the project folder where the plugin is installed")
+    expect(REVOKED).toContain("wait a few seconds and run it again")
+    expect(REVOKED).toContain("/connect → Notion")
+  })
+})
 const REVOKED =
-  "If this sign-in worked earlier, its grant may have been revoked: Notion revokes the whole grant when a refresh token is reused, which two OpenCode processes sharing one sign-in do. Run opencode mcp logout notion, then sign in once."
+  "If this sign-in worked earlier, its grant may have been revoked: Notion revokes the whole grant when a refresh token is reused, which two OpenCode processes sharing one sign-in do. Run opencode mcp logout notion from the project folder where the plugin is installed, or remove the account in /connect → Notion; if it answers MCP server not found: notion, wait a few seconds and run it again, then sign in once."
 const NOTHING_TO_DO = "Nothing to do."
 /** The default rules as /notion-status shows them: one rule a line, a JSON array body. */
 const AGENT_RULES = defaultRules().map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`).join("\n")
@@ -225,6 +235,14 @@ describe("buildStatus", () => {
     )
     expect(buildStatus({ ...base, skills: { own, listed: own } })).not.toHaveProperty("shadowedSkills")
     expect(buildStatus({ ...base, skills: { own, listed }, agents: [{ id: "reviewer", permissions: [allow("*")] }] }).nextStep).toStartWith("Put the default rules")
+  })
+
+  // DR-11: a failed rules insert leaves the agents unguarded, but the fault is the insert; its own step comes first.
+  test("a rules failure points at the OpenCode row, not at the agents it leaves unguarded", () => {
+    const problem = "RULES_NOT_ADDED: Notion's default permission rules could not be added (boom), so Notion tools may run without asking. Next step: Restart OpenCode."
+    const status = buildStatus({ ...base, problems: [problem], agents: [{ id: "reviewer", permissions: [allow("*")] }] })
+    expect(status.nextStep).toBe("Restart OpenCode.")
+    expect(formatStatus(status)).toContain(`- Access: ${POSTURE}; default rules not added (see the OpenCode row)`)
   })
 
   test("an untested host and setup problems show on the OpenCode row; a problem's own next step comes first", () => {

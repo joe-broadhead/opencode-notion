@@ -1,7 +1,7 @@
 # Notion for OpenCode
 
 Search, read and edit your Notion workspace's pages, databases and comments from OpenCode, through Notion's official
-MCP server.
+MCP server. Each change asks first.
 
 Unofficial; not affiliated with Notion.
 
@@ -46,7 +46,7 @@ integration token is needed for the browser sign-in; a headless machine can use 
 shows.
 
 From a terminal, run `opencode mcp auth notion` instead; it opens the link automatically. `/mcps` also offers the same
-sign-in.
+sign-in. Run it from the project folder where the plugin is installed, or remove the account in `/connect` → **Notion**. If it answers `MCP server not found: notion`, OpenCode is still opening that folder: wait a few seconds and run it again.
 
 Notion issues a refresh token that it rotates on every use, and revoking or reusing one ends the whole sign-in. OpenCode
 refreshes its own token as it goes; when it cannot, OpenCode asks for a new sign-in, and `/connect` marks the account while
@@ -209,8 +209,8 @@ Run `/notion-status` first. Its last line is the next step.
 
 | Status or error | What to do |
 | --- | --- |
-| Connection: sign-in required | Run `/connect` and choose Notion, then press `o` or Enter to open the link. In a terminal, `opencode mcp auth notion` opens it automatically. |
-| Connection: sign-in required, and it worked earlier | Its grant may have been revoked: Notion revokes the whole grant when a refresh token is reused, which two OpenCode processes sharing one sign-in do. Run `opencode mcp logout notion`, close the other OpenCode process, then sign in once. |
+| Connection: sign-in required | Run `/connect` and choose Notion, then press `o` or Enter to open the link. In a terminal, `opencode mcp auth notion` opens it automatically. Run it from the project folder where the plugin is installed, or remove the account in `/connect` → **Notion**. If it answers `MCP server not found: notion`, OpenCode is still opening that folder: wait a few seconds and run it again. |
+| Connection: sign-in required, and it worked earlier | Its grant may have been revoked: Notion revokes the whole grant when a refresh token is reused, which two OpenCode processes sharing one sign-in do. Run `opencode mcp logout notion`, close the other OpenCode process, then sign in once. Run it from the project folder where the plugin is installed, or remove the account in `/connect` → **Notion**. If it answers `MCP server not found: notion`, OpenCode is still opening that folder: wait a few seconds and run it again. |
 | Connection: connecting | Wait a few seconds, then run `/notion-status` again. |
 | Connection: failed | Check your network, then run `/notion-status` again. With your own `mcp.servers.notion` that carries an MCP token, check the token in its headers. |
 | Connection: disabled | Enable `notion` in `/mcps`, or remove `"disabled": true` from `mcp.servers.notion` in `opencode.json`. |
@@ -230,7 +230,7 @@ Run `/notion-status` first. Its last line is the next step.
 | Rate limited | Wait the `retry_after_seconds` Notion reports, and make fewer calls at once. A Free, Plus or Education workspace allows 180 requests a minute per connection; Business and Enterprise 600. |
 | Agents without default rules | Put the default rules shown by `/notion-status` first in each listed agent's own permissions, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for Notion tools. |
 | OpenCode: untested | OpenCode is not 2.2.3, 2.2.4 or 2.2.5. Inside `>=2.2.3 <2.3.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If Notion misbehaves, use a tested release. |
-| Signed in to the wrong workspace | Run `opencode mcp logout notion` (or remove the account in `/connect` → Notion), then sign in again. |
+| Signed in to the wrong workspace | Run `opencode mcp logout notion` (or remove the account in `/connect` → Notion), then sign in again. Run it from the project folder where the plugin is installed, or remove the account in `/connect` → **Notion**. If it answers `MCP server not found: notion`, OpenCode is still opening that folder: wait a few seconds and run it again. |
 | A Notion tool is refused in `opencode run` | Nobody could answer its prompt. A read runs if you add an `allow` rule for it to the agent's own `permissions`. A write needs an interactive session: this plugin documents no `allow` for one, and a saved one would run it unasked in every agent of the project. |
 | A skill seems ignored, and status names a skill to rename or move | A skill of yours with the same id, such as `notion`, replaces the plugin's. Rename or move it. |
 | `/notion` is missing | The plugin did not start. Run `/plugins` to see the error. |
@@ -275,8 +275,9 @@ Sign out while the plugin is still installed: once it is removed, OpenCode no lo
 `opencode mcp logout notion` fails with `MCP server not found: notion` and the sign-in stays in OpenCode's credential
 store.
 
-1. Sign out: `opencode mcp logout notion`. Right after OpenCode starts or reloads, it can answer `MCP server not found:
-   notion` for a few seconds; wait, then run it again.
+1. Sign out from the project folder where the plugin is installed: `opencode mcp logout notion`, or remove the account in
+   `/connect` → **Notion**. If it answers `MCP server not found: notion`, OpenCode is still opening that folder: wait a
+   few seconds and run it again.
 2. Check: `opencode auth list` no longer lists **Notion**.
 3. Remove the plugin: `opencode plugin remove @joe-broadhead/opencode-notion`, then `opencode reload`. `opencode mcp list`
    no longer lists `notion`.

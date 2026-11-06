@@ -21,15 +21,15 @@ import { agentRules, attempt, cleanup, effect, HOST_VERSION, session, startHost,
 const AGENT_RULES = defaultRules().map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`).join("\n")
 const AGENTS_NEXT_STEP = "Put the default rules shown by /notion-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Notion tools."
 const TOKEN = "ntn_fake_host_test_0123456789"
-const SIGN_IN = "Run /connect and choose Notion, then press o or Enter to open the link (in a terminal, opencode mcp auth notion opens it automatically)."
+const SIGN_IN = "Run /connect and choose Notion, then press o or Enter to open the link (in a terminal, opencode mcp auth notion opens it automatically: run it from the project folder where the plugin is installed, and if it answers MCP server not found: notion, wait a few seconds and run it again)."
 const SIGN_IN_AGAIN = "Notion needs a new sign-in. Choose this account to sign in again."
 /** The default list: two reads, every write, every denied tool, and the unknown one. */
 const LISTED = 2 + WRITE_TOOLS.length + DENY_TOOLS.length + 1
 const AVAILABLE = 2 + WRITE_TOOLS.length + 1
 const OFF = `${DENY_TOOLS.slice(0, -1).join(", ")} and ${DENY_TOOLS.at(-1)}`
 
-// Starting a host takes several seconds, more on a busy machine.
-setDefaultTimeout(120_000)
+// Starting a host takes several seconds, more on a busy machine; the longest wait below polls a condition with 180 s.
+setDefaultTimeout(300_000)
 afterAll(cleanup)
 
 const BUILT_IN = ["build", "general", "explore", "compaction", "title", "summary", "plan"]
@@ -183,6 +183,7 @@ describe(`the plugin on OpenCode ${HOST_VERSION}`, () => {
 
   test("H5: /notion-status reports the connection, the tools, the denied ones, the unguarded agent and its fix", async () => {
     await notionTools(host)
+    const before = host.fake.calls.length
     const text = await status(host, await session(host))
     expect(text).toContain(`- Connection: connected (${host.fake.url}, registered by this plugin)`)
     // No account read yet, so no workspace name.
@@ -197,6 +198,9 @@ describe(`the plugin on OpenCode ${HOST_VERSION}`, () => {
     expect(text).not.toContain("Plan")
     const output = await statusRpc(host)
     expect(output).toMatchObject({ state: "connected", workspace: null, connection: null, beta: true, tools: AVAILABLE, deniedTools: [...DENY_TOOLS], unknownCount: 1, listing: false, unguardedAgents: ["reviewer"] })
+    // DR-9: status is built from the host's own lists; neither the command nor the RPC calls Notion. The dialog shows the
+    // same RPC answer through the terminal UI, so it adds no call either.
+    expect(host.fake.calls.slice(before)).toEqual([])
   })
 
   test("the account comes from a notion-get-self the model or a script asked for, never a call of the plugin's", async () => {
@@ -509,7 +513,7 @@ describe("a server that asks for a sign-in", () => {
     // this is the revoked-grant case, which the account clear on needs_auth must not erase.
     const sessionID = await session(host)
     await scriptCall(host, ACCOUNT_READ, { sessionID, input: {} })
-    await until("the workspace is read", async () => ((await statusRpc(host)).workspace === "Acme Robotics" ? true : undefined))
+    await until("the workspace is read", async () => ((await statusRpc(host)).workspace === "Acme Robotics" ? true : undefined), 180_000)
     // The tokens stop working: the next connection gets the challenge.
     host.fake.challenge = true
     const mcp = host.client.mcp as unknown as Record<"connect" | "disconnect", (input: object) => Promise<unknown>>

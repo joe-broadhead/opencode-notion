@@ -135,9 +135,11 @@ describe("skills", () => {
     // SC-12: an unnamed meeting note is a question, not a guess.
     expect(text).toContain("When the app isn't named, ask which, or say which source you read")
     // SC-4: the calendar is the user's own, reached through Notion; route it to gws.
-    expect(text).toContain("The user's calendar belongs to Google Workspace")
+    expect(text).toContain("The Notion calendar tools read the calendars connected to Notion, a second path to the user's own")
+    expect(text).toContain("The user's calendar\n  is Google Workspace's when it is a Google calendar".replace("\n  ", " "))
     expect(text).not.toContain("not the user's own schedule")
-    expect(text).toContain("The user's calendar belongs to Google Workspace")
+    expect(text).toContain("The Notion calendar tools read the calendars connected to Notion, a second path to the user's own")
+    expect(text).toContain("The user's calendar\n  is Google Workspace's when it is a Google calendar".replace("\n  ", " "))
   })
 
   test("notion keeps to the family's rules for answers: signatures, labels, misses, empty results, dates and other sources", () => {
@@ -171,7 +173,7 @@ describe("skills", () => {
 
   test("notion says the legacy combined search is not called, and every change goes to notion-write", () => {
     const text = flat("notion")
-    expect(text).toContain("Do not call `notion-ai-search`: it is the legacy combined search.")
+    expect(text).toContain("Prefer `notion-search` and `notion-connector-search`; `notion-ai-search` is the legacy combined search.")
     expect(text).toContain("Load `notion-write` before any create, edit, comment, move, duplicate, database change, file, Notion Calendar event or suggestion decision.")
     // SC-11: history has a call, and restoring an old version is the denied one.
     expect(text).toContain("\"What changed here\" is `notion-get-version-changes`")

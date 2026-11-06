@@ -31,6 +31,8 @@ describe("Notion's tools RPC", () => {
 
   test("names Notion's own commands in its next steps, the rate limit, and no per-account servers", () => {
     expect(NEXT_STEPS.AUTH_REQUIRED).toContain("/connect and choose Notion")
+    expect(NEXT_STEPS.AUTH_REQUIRED).toContain("run it from the project folder where the plugin is installed")
+    expect(NEXT_STEPS.AUTH_REQUIRED).toContain("MCP server not found: notion")
     expect(NEXT_STEPS.SERVER_CONFLICT).toContain("mcp.servers.notion")
     expect(NEXT_STEPS.TOOL_UNAVAILABLE).toBe("Call describe to see which methods OpenCode lists now, and run /notion-status.")
     expect(NEXT_STEPS.UPSTREAM_ERROR).toContain("if Notion reports rate_limited, wait retry_after_seconds and make fewer calls at once")

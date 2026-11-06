@@ -90,7 +90,7 @@
   },
   "jelly": {
     "title": "Notion",
-    "summary": "Your Notion pages, databases, comments and meeting notes.",
+    "summary": "Read and edit your Notion pages, databases and comments, with every change asking.",
     "icon": "assets/icon.svg",
     "tools": [
       {

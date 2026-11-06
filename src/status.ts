@@ -88,13 +88,13 @@ export interface Status {
   readonly nextStep: string
 }
 
-const SIGN_IN = `Run /connect and choose Notion, then press o or Enter to open the link (in a terminal, opencode mcp auth ${SERVER_NAME} opens it automatically).`
+const SIGN_IN = `Run /connect and choose Notion, then press o or Enter to open the link (in a terminal, opencode mcp auth ${SERVER_NAME} opens it automatically: run it from the project folder where the plugin is installed, and if it answers MCP server not found: ${SERVER_NAME}, wait a few seconds and run it again).`
 /**
  * Notion rotates a refresh token on every use, and reusing one that has been rotated away revokes the whole grant. So a
  * sign-in that worked and then needed a new one may have been revoked by a second OpenCode process sharing it.
  */
 const REVOKED =
-  "If this sign-in worked earlier, its grant may have been revoked: Notion revokes the whole grant when a refresh token is reused, which two OpenCode processes sharing one sign-in do. Run opencode mcp logout notion, then sign in once."
+  `If this sign-in worked earlier, its grant may have been revoked: Notion revokes the whole grant when a refresh token is reused, which two OpenCode processes sharing one sign-in do. Run opencode mcp logout ${SERVER_NAME} from the project folder where the plugin is installed, or remove the account in /connect → Notion; if it answers MCP server not found: ${SERVER_NAME}, wait a few seconds and run it again, then sign in once.`
 
 /** The default rules to paste into an agent's own permissions, one rule a line, as a JSON array body. */
 const AGENT_RULES = defaultRules()
@@ -180,6 +180,9 @@ function nextStepOf(status: Omit<Status, "nextStep">, wasSignedIn: boolean): str
   if (status.tools === 0 && status.deniedTools.length === 0) {
     return "Notion lists no tools for this connection. Ask an admin whether AI apps are restricted to an approved list (Settings, Connections, Permissions, AI apps), then sign in again."
   }
+  // A failed insert points at the row that names the fault, not at the agents the same failure leaves unguarded.
+  const notAdded = status.problems.find((problem) => problem.startsWith(RULES_NOT_ADDED))?.split(" Next step: ")[1]
+  if (notAdded) return notAdded
   if (status.unguardedAgents.length) return AGENTS_NEXT_STEP
   // A problem reads `CODE: What happened. Next step: What to do.`; its own next step becomes the status's.
   const problem = status.problems[0]?.split(" Next step: ")[1]

@@ -34,11 +34,9 @@ read it rather than guess. Keep calls to a few at a time: every call counts agai
 - Connected sources, multi-source SQL and meeting notes need Business or Enterprise with Notion AI; single-source SQL
   is metered; editing a comment, reactions, suggestions and version history need Business or Enterprise.
   `notion-get-tool-access` says what this connection has: check it first, and say what is missing rather than retry.
-- An empty result proves little: say which filters you used, and that Notion's own permissions limit what the person
-  can see. `object_not_found` on a fetch can be a permission answer.
+- An empty result proves little: say which filters you used, and that Notion's own permissions limit what the person can see. `object_not_found` on a fetch can be a permission answer.
 - `notion-get-comments` reads a page's threads and pending suggestions; a suggestion is a proposal, not an edit.
-- `notion-get-file-download-urls` gives URLs that expire in minutes: hand them to the user in chat only, never into a
-  page, a message or a file.
+- `notion-get-file-download-urls` gives URLs that expire in minutes: hand them to the user in chat only, never into a page, a message or a file.
 
 ## Answering
 
@@ -57,14 +55,14 @@ read it rather than guess. Keep calls to a few at a time: every call counts agai
   connected sources by name, or for both, and then search Notion as well; label a hit as Notion's connector. "Find
   everything about X" with no source named is a question to ask, not a licence to search them all.
 - `notion-fetch` can open a Slack thread or a Drive file through the user's own connection to that source: label it as
-  that source. Do not call `notion-ai-search`: it is the legacy combined search.
+  that source. Prefer `notion-search` and `notion-connector-search`; `notion-ai-search` is the legacy combined search.
 - Elsewhere: Google Docs, Sheets, Drive, Gmail and Google Calendar are `opencode-gws`; Slack is `slack-search`; GitHub
   is `github`; Linear is `linear`; Jira and Confluence are `jira`; a meeting is `granola` or `wisprflow`, an interview
   is `metaview`, a recording is `opencode-plaud`, the web is `tavily`, and past agent sessions are `history-recall`. A
   Notion database that tracks issues is still a Notion page.
-- The Notion calendar tools act on the same Google or Outlook calendars through Notion's own connection. The user's
-  calendar belongs to Google Workspace: answer "what's on my calendar", and create or move an event, there. Use a Notion
-  calendar tool only for Notion Calendar itself, a room or resource, or an event shared with them.
+- The Notion calendar tools read the calendars connected to Notion, a second path to the user's own. The user's calendar
+  is Google Workspace's when it is a Google calendar: answer "what's on my calendar", and create or move an event, there.
+  Use a Notion calendar tool only for Notion Calendar itself, a room or resource, or an event shared with them.
 
 ## Personal data
 
@@ -86,9 +84,11 @@ suggestion decision.
 ## Sign-in and status
 
 `/notion-status`'s last line is the next step. To sign in, run `/connect` and choose Notion, then press `o` or Enter to
-open the link (in a terminal, `opencode mcp auth notion` opens it automatically). Never ask for a password, an
-integration token or an API key. The wrong workspace: `opencode mcp logout notion`, then sign in again. No tools, or a
-refused connection: a guest cannot connect at all, and an Enterprise admin may restrict AI apps to an approved list.
+open the link (in a terminal, `opencode mcp auth notion` opens it automatically). Run either from the project folder where
+the plugin is installed; if it answers `MCP server not found: notion`, wait a few seconds and run it again. Never ask for
+a password, an integration token or an API key. The wrong workspace: `opencode mcp logout notion` from that folder, then
+sign in again. No tools, or a refused connection: a guest cannot connect at all, and an Enterprise admin may restrict AI
+apps to an approved list.
 
 ## Scripts
 

@@ -5,7 +5,7 @@ import { checkHost } from "../../src/host-version.js"
 import { buildStatus, formatStatus, StatusRpc, type Status } from "../../src/status.js"
 import tui, { setupView, viewMessage, type ViewContext } from "../../src/tui.js"
 
-const SIGN_IN = "Run /connect and choose Notion, then press o or Enter to open the link (in a terminal, opencode mcp auth notion opens it automatically)."
+const SIGN_IN = "Run /connect and choose Notion, then press o or Enter to open the link (in a terminal, opencode mcp auth notion opens it automatically: run it from the project folder where the plugin is installed, and if it answers MCP server not found: notion, wait a few seconds and run it again)."
 
 const status = (overrides: Partial<Parameters<typeof buildStatus>[0]> = {}): Status =>
   buildStatus({ server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.notion.com/mcp", signIn: "oauth" }, tools: ["notion-search"], host: checkHost("2.2.3", false), ...overrides })

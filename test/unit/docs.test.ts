@@ -135,6 +135,16 @@ describe("docs", () => {
     for (const file of ["README.md", "SECURITY.md"]) expect(text(file)).toContain("beats an `ask` but never a `deny`")
   })
 
+  // DR-4: mcp auth and mcp logout work, and the cold-start race is the one failure; every place that names them says so.
+  test("the sign-in and sign-out commands carry the cold-start caveat", () => {
+    const caveat = "If it answers `MCP server not found: notion`, OpenCode is still opening that folder: wait a few seconds and run it again"
+    const readme = text("README.md")
+    expect(readme).toContain(caveat)
+    expect(readme).toContain("Run it from the project folder where the plugin is installed, or remove the account in `/connect` → **Notion**")
+    expect(text("skills/notion/SKILL.md")).toContain("Run either from the project folder where")
+    expect(text("skills/notion/SKILL.md")).toContain("if it answers `MCP server not found: notion`, wait a few seconds and run it again")
+  })
+
   test("the README's Uninstall signs out before it removes the plugin", () => {
     const uninstall = /## Uninstall(.*?)## Links/.exec(text("README.md"))?.[1] ?? ""
     const logout = uninstall.indexOf("opencode mcp logout notion")
