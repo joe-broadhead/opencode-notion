@@ -341,6 +341,27 @@ describe("a Code Mode turn that asks for the denied tools", () => {
     expect(host.fake.calls).toContain(SAMPLE_READ)
     for (const tool of DENY_TOOLS) expect(host.fake.calls).not.toContain(tool)
   })
+
+  // AF-5: a write inside a program asks, and a refusal stops it before Notion is called.
+  test("a write inside the program asks, and a declined prompt stops it", async () => {
+    const code = [
+      "const results = []",
+      `results.push(String((await tools.notion[${JSON.stringify(SAMPLE_READ)}]({})) !== undefined))`,
+      `try { await tools.notion[${JSON.stringify(SAMPLE_WRITE)}]({ query: 'comment on it' }); results.push('write: ran') } catch (error) { results.push('write: refused') }`,
+      "return results",
+    ].join("\n")
+    host.fake.model.script = [{ tool: "execute", arguments: { code } }]
+    const sessionID = (await scripted(host).create({ agent: "build", location: host.location, model: { providerID: "lmstudio", id: MODEL_ID } })).id
+    const before = host.fake.calls.length
+    const turn = scripted(host).prompt({ sessionID, text: "Comment on the launch page." })
+    const request = await until("the write asks for permission", async () => (await host.client.permission.list({ sessionID })).find((item) => item.action === `notion_${SAMPLE_WRITE}`))
+    expect(request.action).toBe(`notion_${SAMPLE_WRITE}`)
+    await host.client.permission.reply({ sessionID, requestID: request.id, decision: "reject" })
+    await turn
+    expect(host.fake.calls.slice(before)).not.toContain(SAMPLE_WRITE)
+    // The read in the same program still ran, so the refusal was the write's alone.
+    expect(host.fake.calls.slice(before)).toContain(SAMPLE_READ)
+  })
 })
 
 describe("the documented opt-in for a denied tool", () => {
