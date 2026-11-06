@@ -79,10 +79,11 @@ export function evaluate(permissions: readonly Rule[], action: string): Rule["ef
 
 /**
  * Agents where a new Notion tool would run without asking: a base allow, no default rules after it, and nothing
- * else in the agent's own rules that asks or denies for it. An agent whose rules already stop every Notion tool
+ * else in the agent's own rules that asks or denies for it. The probe is shaped like a Notion tool, `notion_notion-…`,
+ * so an agent's own `notion_notion-*` rule is evaluated for it. An agent whose rules already stop every Notion tool
  * needs no fix, and one without a base allow gets no rules.
  */
 export const unguardedAgents = (agents: readonly { readonly id: string; readonly permissions: readonly Rule[] }[]) =>
   agents
-    .filter((agent) => agent.permissions.some((item) => same(item, BASE_ALLOW)) && !hasDefaultRules(agent.permissions) && evaluate(agent.permissions, actionOf("new_tool")) === "allow")
+    .filter((agent) => agent.permissions.some((item) => same(item, BASE_ALLOW)) && !hasDefaultRules(agent.permissions) && evaluate(agent.permissions, actionOf("notion-new-tool")) === "allow")
     .map((agent) => agent.id)

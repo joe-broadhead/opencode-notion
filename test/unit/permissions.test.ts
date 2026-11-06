@@ -5,7 +5,7 @@ import { agentEditor, allow, builtInAgents, transforms, type AgentEditor, type F
 
 const ask: Rule = { action: "notion_*", resource: "*", effect: "ask" }
 const deny = (action: string): Rule => ({ action, resource: "*", effect: "deny" })
-const ACTIONS = ["notion_notion-search", "notion_notion-get-self", "notion_notion-create-comment", "notion_notion-delete-pages", "notion_notion-new_tool", "notion_notion-restore-version"]
+const ACTIONS = ["notion_notion-search", "notion_notion-get-self", "notion_notion-create-comment", "notion_notion-delete-pages", "notion_notion-new-tool", "notion_notion-restore-version"]
 const effects = (rules: readonly Rule[]) => ACTIONS.map((action) => evaluate(rules, action))
 
 describe("defaultRules", () => {
@@ -123,6 +123,8 @@ describe("unguardedAgents", () => {
       { id: "ask-rule-only", permissions: [allow("*"), { ...ask }] },
       { id: "locked", permissions: [allow("*"), deny("*")] },
       { id: "denies-notion", permissions: [allow("*"), deny("notion_*")] },
+      // An agent whose own rule asks for every Notion tool is already safe: the probe is shaped like one, so it matches.
+      { id: "asks-notion-tools", permissions: [allow("*"), { action: "notion_notion-*", resource: "*", effect: "ask" as const }] },
       // No base allow: the plugin adds no rules there, and nothing needs fixing.
       { id: "own-allow-no-base", permissions: [allow("notion_*")] },
     ]

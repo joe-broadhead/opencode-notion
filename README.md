@@ -17,6 +17,7 @@ Unofficial; not affiliated with Notion.
 - An Enterprise workspace can restrict AI apps to an approved list. If yours does, an admin adds OpenCode first.
 - Notion stores workspace data in the United States, unless your Enterprise workspace has been migrated to another
   region.
+- Notion still labels this MCP server beta, so its tools and behaviour can change without notice.
 - The tool table, and which tools read and write, comes from Notion's own documentation. This release has not been
   reconciled with a live tool list, so treat a tool's class as Notion's description of it, not as its annotation.
 

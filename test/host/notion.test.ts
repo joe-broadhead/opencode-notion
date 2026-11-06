@@ -186,15 +186,17 @@ describe(`the plugin on OpenCode ${HOST_VERSION}`, () => {
     const text = await status(host, await session(host))
     expect(text).toContain(`- Connection: connected (${host.fake.url}, registered by this plugin)`)
     // No account read yet, so no workspace name.
-    expect(text).toContain("- Account: not read yet: it appears after the first Notion call since OpenCode started\n")
+    expect(text).toContain("- Account: not read yet: it appears after a notion-get-self call\n")
     expect(text).toContain(`- Access: reads run without asking; the ${WRITE_TOOLS.length} changes and any new tool ask first; the ${DENY_TOOLS.length} that delete, replace a whole page, upload a Skill, drive a Notion agent or cancel an event are off; default rules missing in the agents listed below\n`)
+    // Notion's own sign-in metadata calls the server beta; status says so wherever it runs.
+    expect(text).toContain("- Server: Notion MCP (Beta): Notion may change its tools and behaviour\n")
     expect(text).toContain(`- Tools: ${AVAILABLE} available, 1 unknown: shiny_new_tool (unknown tools ask before running); off by default: ${OFF}\n`)
     expect(text).toContain(`- Agents without default rules: reviewer\n${AGENT_RULES}\n`)
     expect(text).toContain(`- Next step: ${AGENTS_NEXT_STEP}`)
     expect(text).toContain(`- OpenCode: ${HOST_VERSION} (${TESTED_HOSTS.includes(HOST_VERSION) ? "tested" : "untested"}; supported range ${SUPPORTED_HOST})`)
     expect(text).not.toContain("Plan")
     const output = await statusRpc(host)
-    expect(output).toMatchObject({ state: "connected", workspace: null, connection: null, tools: AVAILABLE, deniedTools: [...DENY_TOOLS], unknownCount: 1, listing: false, unguardedAgents: ["reviewer"] })
+    expect(output).toMatchObject({ state: "connected", workspace: null, connection: null, beta: true, tools: AVAILABLE, deniedTools: [...DENY_TOOLS], unknownCount: 1, listing: false, unguardedAgents: ["reviewer"] })
   })
 
   test("the account comes from a notion-get-self the model or a script asked for, never a call of the plugin's", async () => {

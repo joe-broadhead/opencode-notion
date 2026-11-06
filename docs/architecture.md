@@ -80,7 +80,8 @@ integration, so there is nothing to name.
 and connection type come from `watchAccount`: the last `notion-get-self` result the model or a script asked for, in memory
 only. `buildStatus` turns them into one model, and `formatStatus` renders it in a fixed order: Connection (state and
 server), Account (the workspace name, or "not read yet"), Access (the posture the default rules fix, the connection type,
-and whether the rules are in place), Tools (counts, the denied tools, and up to 20 unknown names), Agents without default
+and whether the rules are in place), Server (Notion's beta label), Tools (counts, the denied tools, and up to 20 unknown
+names), Agents without default
 rules (names, then the default rules to paste, one rule a line), OpenCode (version, tested or not, the supported range, and
 setup problems), and exactly one Next step, "Nothing to do." when nothing is needed. For 15 seconds after the server's
 status changes, no tools means "still listing", not "none for this connection", so the advice about an approved list never

@@ -66,6 +66,8 @@ export interface Status {
   readonly workspace: string | null
   /** Whether that connection acts as a person or as a workspace connection, or null before an account read. */
   readonly connection: "person" | "bot" | null
+  /** True while Notion labels its MCP server beta, which its sign-in metadata does. */
+  readonly beta: boolean
   /** How many Notion tools OpenCode lists and the default rules let run or ask: the listed ones that are not denied. */
   readonly tools: number
   /** The listed tools that the default rules deny, such as notion-delete-pages; a later rule of the user's can turn one on. */
@@ -136,6 +138,7 @@ export function buildStatus(facts: StatusFacts): Status {
     ...(facts.source ? { source: facts.source } : {}),
     workspace: facts.account?.workspace ? cut(oneLine(facts.account.workspace), ACCOUNT_LIMIT) : null,
     connection: facts.account?.connection ?? null,
+    beta: true,
     tools: listed.length - denied.length,
     deniedTools: denied,
     listing: state === "connected" && listed.length === 0 && facts.settling === true,
@@ -252,8 +255,9 @@ export function formatStatus(status: Status) {
   return [
     "Notion status",
     `- Connection: ${STATE_TEXT[status.state]}${details ? ` (${details})` : ""}`,
-    `- Account: ${status.workspace ?? "not read yet: it appears after the first Notion call since OpenCode started"}`,
+    `- Account: ${status.workspace ?? "not read yet: it appears after a notion-get-self call"}`,
     `- Access: ${accessText(status)}`,
+    `- Server: ${status.beta ? "Notion MCP (Beta): Notion may change its tools and behaviour" : "Notion MCP"}`,
     `- Tools: ${toolsText(status)}`,
     `- Agents without default rules: ${agents.length ? `${agents.join(", ")}\n${AGENT_RULES}` : "none"}`,
     `- OpenCode: ${hostText(status)}`,
@@ -343,7 +347,7 @@ export const StatusRpc = {
       input: { type: "object" },
       output: {
         type: "object",
-        required: ["version", "state", "workspace", "connection", "tools", "deniedTools", "listing", "unknownCount", "unknownTools", "unguardedAgents", "host", "problems", "nextStep"],
+        required: ["version", "state", "workspace", "connection", "beta", "tools", "deniedTools", "listing", "unknownCount", "unknownTools", "unguardedAgents", "host", "problems", "nextStep"],
         properties: {
           version: { type: "string" },
           state: { enum: ["connected", "sign_in_required", "connecting", "disabled", "failed", "not_configured", "conflict"] },
@@ -355,6 +359,7 @@ export const StatusRpc = {
           },
           workspace: nullableString,
           connection: { enum: ["person", "bot", null] },
+          beta: { type: "boolean" },
           tools: count,
           deniedTools: strings,
           listing: { type: "boolean" },

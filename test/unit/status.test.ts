@@ -30,6 +30,7 @@ describe("buildStatus", () => {
       source: { type: "plugin", url: URL, signIn: "oauth" },
       workspace: "Acme Robotics",
       connection: "person",
+      beta: true,
       tools: 1,
       deniedTools: [],
       listing: false,
@@ -46,6 +47,7 @@ describe("buildStatus", () => {
         "- Connection: connected (https://mcp.notion.com/mcp, registered by this plugin)",
         "- Account: Acme Robotics",
         `- Access: ${POSTURE}; your Notion account; ${RULES}`,
+        "- Server: Notion MCP (Beta): Notion may change its tools and behaviour",
         "- Tools: 1 available, 0 unknown",
         "- Agents without default rules: none",
         "- OpenCode: 2.2.3 (tested; supported range >=2.2.3 <2.3.0)",
@@ -58,7 +60,7 @@ describe("buildStatus", () => {
     const status = buildStatus(base)
     expect(status).toMatchObject({ workspace: null, connection: null })
     const text = formatStatus(status)
-    expect(text).toContain("- Account: not read yet: it appears after the first Notion call since OpenCode started\n")
+    expect(text).toContain("- Account: not read yet: it appears after a notion-get-self call\n")
     expect(text).toContain(`- Access: ${ACCESS}\n`)
     expect(text).not.toContain("your Notion account")
   })
@@ -210,7 +212,7 @@ describe("buildStatus", () => {
 
   test("the rows come in the standard order", () => {
     const rows = formatStatus(buildStatus(base)).split("\n").filter((line) => line.startsWith("- ")).map((line) => line.slice(2, line.indexOf(":")))
-    expect(rows).toEqual(["Connection", "Account", "Access", "Tools", "Agents without default rules", "OpenCode", "Next step"])
+    expect(rows).toEqual(["Connection", "Account", "Access", "Server", "Tools", "Agents without default rules", "OpenCode", "Next step"])
   })
 
   test("a skill of the same id at another path shadows the plugin's: status names it, after any other next step", () => {
