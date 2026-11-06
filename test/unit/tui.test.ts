@@ -119,7 +119,7 @@ describe("status view", () => {
   })
 
   test("a sign-in that worked and then failed asks for a new one, and names the revoked grant", async () => {
-    const answer = status({ server: { status: "needs_auth", error: "Authorization required" }, account: { workspace: "Acme Robotics", connection: "person" } })
+    const answer = status({ server: { status: "needs_auth", error: "Authorization required" }, account: { workspace: "Acme Robotics", connection: "person" }, wasSignedIn: true })
     expect(viewMessage({ status: answer })).toContain(`- Next step: ${SIGN_IN} If this sign-in worked earlier`)
   })
 

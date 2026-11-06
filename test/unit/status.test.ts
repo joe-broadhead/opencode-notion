@@ -87,10 +87,9 @@ describe("buildStatus", () => {
   test("a sign-in that worked and then failed says a revoked grant is possible, and one that never worked does not", () => {
     const before = buildStatus({ ...base, server: { status: "needs_auth" } })
     expect(before.nextStep).toBe(SIGN_IN)
-    const after = buildStatus({ ...base, server: { status: "needs_auth" }, account: { workspace: "Acme Robotics", connection: "person" } })
+    const after = buildStatus({ ...base, server: { status: "needs_auth" }, account: { workspace: "Acme Robotics", connection: "person" }, wasSignedIn: true })
     expect(after.nextStep).toBe(`${SIGN_IN} ${REVOKED}`)
-    // A status read forgets the workspace as soon as the server needs a new sign-in, so the plain step comes back once
-    // the model's last notion-get-self is no longer current.
+    // The workspace is still shown; a status read forgets it for the next time.
     expect(after.workspace).toBe("Acme Robotics")
   })
 
@@ -285,11 +284,13 @@ describe("readStatus", () => {
     expect(status).toMatchObject({ workspace: null, connection: null })
   })
 
-  test("a server that needs a new sign-in forgets the workspace, so the revoked-grant step cannot outlive it", async () => {
+  test("a server that needs a new sign-in forgets the workspace, and says a grant it had may be revoked", async () => {
     const account = accountState({ workspace: "Acme Robotics", connection: "person" })
     const status = await readStatus(statusContext("needs_auth"), { host, account })
     expect(account.state.forgotten).toBe(1)
-    expect(status).toMatchObject({ state: "sign_in_required", workspace: null, connection: null, nextStep: SIGN_IN })
+    expect(status).toMatchObject({ state: "sign_in_required", workspace: null, connection: null, nextStep: `${SIGN_IN} ${REVOKED}` })
+    // With no earlier workspace there was no working sign-in, so the plain step is all there is.
+    expect(await readStatus(statusContext("needs_auth"), { host })).toMatchObject({ nextStep: SIGN_IN })
   })
 
   test("no tools moments after a status change is still listing; later it is not", async () => {

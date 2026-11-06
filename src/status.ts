@@ -32,6 +32,11 @@ export interface StatusFacts {
   readonly source?: ServerSource
   /** The workspace and connection type from the last `notion-get-self` result since OpenCode started. */
   readonly account?: Account
+  /**
+   * True when this status read found the server needing a new sign-in while a workspace from an earlier call was still
+   * known: the sign-in worked before, so a revoked grant is the likely cause.
+   */
+  readonly wasSignedIn?: boolean
   readonly host: HostCheck
   /** The names of the tools the `notion` server serves, without the `notion_` prefix. */
   readonly tools?: readonly string[]
@@ -141,10 +146,10 @@ export function buildStatus(facts: StatusFacts): Status {
     host: facts.host,
     problems: facts.problems ?? [],
   }
-  return { ...status, nextStep: nextStepOf(status) }
+  return { ...status, nextStep: nextStepOf(status, facts.wasSignedIn === true) }
 }
 
-function nextStepOf(status: Omit<Status, "nextStep">): string {
+function nextStepOf(status: Omit<Status, "nextStep">, wasSignedIn: boolean): string {
   const { source } = status
   switch (status.state) {
     case "conflict": {
@@ -158,8 +163,9 @@ function nextStepOf(status: Omit<Status, "nextStep">): string {
     case "connecting":
       return "Notion is still connecting. Run /notion-status again in a few seconds."
     case "sign_in_required":
-      // A workspace name was read in this run, so the sign-in worked before: a revoked grant is the likely cause.
-      return status.workspace === null ? SIGN_IN : `${SIGN_IN} ${REVOKED}`
+      // A workspace was read in this run before the server asked for a new sign-in, so it worked: a revoked grant is
+      // the likely cause.
+      return wasSignedIn ? `${SIGN_IN} ${REVOKED}` : SIGN_IN
     case "failed":
       // A user's own entry with `oauth: false` signs in with an MCP token, which only a workspace owner can create.
       if (source?.type === "adopted" && source.signIn === "own") {
@@ -292,13 +298,16 @@ export async function readStatus(
     ),
   ])
   const server = servers.data.find((entry) => entry.name === SERVER_NAME)
-  // A server that needs a new sign-in may come back as another workspace.
+  // A server that needs a new sign-in may come back as another workspace. Note whether one was known first, so status
+  // can tell a first sign-in from one that worked and was revoked.
+  const wasSignedIn = server?.status.status === "needs_auth" && facts.account?.current() !== undefined
   if (server?.status.status === "needs_auth") facts.account?.forget()
   const account = facts.account?.current()
   const { skills: own, listing, account: watched, ...rest } = facts
   const settling = listing !== undefined && Date.now() - listing.changedAt() < LISTING_MS
   return buildStatus({
     ...rest,
+    wasSignedIn,
     ...(server ? { server: server.status } : {}),
     ...(account ? { account } : {}),
     tools: tools.filter((tool) => tool.options?.namespace === SERVER_NAME).map((tool) => tool.name),
