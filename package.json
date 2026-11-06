@@ -73,7 +73,8 @@
     "test": "node scripts/check.mjs unit",
     "test:host": "node scripts/check.mjs host",
     "test:pack": "node scripts/check.mjs pack",
-    "lint": "node scripts/check.mjs forbidden"
+    "lint": "node scripts/check.mjs forbidden",
+    "drift": "node scripts/drift.mjs"
   },
   "devDependencies": {
     "@opencode/client": "2.2.3",

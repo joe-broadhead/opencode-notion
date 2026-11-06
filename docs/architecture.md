@@ -27,7 +27,11 @@ tool of its own, makes no Notion call of its own, and has no runtime dependencie
 
 The default rules, the tools RPC's methods, status's unknown tools, the fake server in the tests and the checks of
 `jelly.tools` and the skills all derive from `src/notion-tools.ts`, so a change to Notion's tools is a change there, in
-`jelly.tools`, and in any skill example that names a tool.
+`jelly.tools`, and in any skill example that names a tool. `test/unit/notion-live-tools.json` is the tool table as a
+signed-in server should list it, fed from Notion's documentation until the first reconcile; `npm run drift` compares it
+with the lists, and the live-tools test proves that every name in it has one rule and every deny is hidden. When the live
+list arrives, it replaces the fixture, and the reconcile is that file plus the lists. If Notion no longer lists
+`notion-ai-search`, the reconcile removes it from `READ_TOOLS`, and its allow rule and script method go with it.
 
 `scripts/build.mjs` bundles each entry with esbuild into one self-contained file: `src/index.ts` into `dist/index.js` and
 `src/tui.ts` into `dist/tui.js`. Shared code, such as the status model and the RPC contract, is inlined into both. The

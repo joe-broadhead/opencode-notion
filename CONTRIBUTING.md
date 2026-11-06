@@ -40,6 +40,7 @@ npm run check
 | `typecheck` | `tsc --noEmit` over `src/` and `test/`, strict, with unused names as errors |
 | `unit` | `bun test ./test/unit`: every module in `src/`, the docs' counts and error table, and the Jelly declaration |
 | `build` | `node scripts/build.mjs`: deletes `dist/` and bundles `src/index.ts` and `src/tui.ts` with esbuild into the self-contained `dist/index.js` and `dist/tui.js`. Fails if a bundle imports anything the host does not provide |
+| `icons` | `node scripts/check-icons.mjs`: the SVG is clean and exact, the 128 and 256 rasters exist, and `exports` and `files` agree |
 | `host` | `bun test ./test/host`: the plugin inside an embedded OpenCode host, once on each tested release (`@opencode/sdk` 2.2.3, 2.2.4 and 2.2.5) |
 | `pack` | `bun test ./test/pack`: builds, packs and installs the package, imports both entry points, and loads it in stock OpenCode 2.2.3, 2.2.4 and 2.2.5 |
 | `forbidden` | `node scripts/check-forbidden.mjs`: scans `src/`, `test/`, `scripts/` and `dist/` for forbidden APIs and machine-local paths |
@@ -51,8 +52,8 @@ To run some stages only, name them; they run in the order given:
 node scripts/check.mjs typecheck unit
 ```
 
-Shortcuts: `npm run typecheck`, `npm run build`, `npm test` (the `unit` stage), `npm run test:host`, `npm run test:pack` and
-`npm run lint` (the `forbidden` stage).
+Shortcuts: `npm run typecheck`, `npm run build`, `npm test` (the `unit` stage), `npm run test:host`, `npm run test:pack`,
+`npm run lint` (the `forbidden` stage) and `npm run drift` (the tool-table reconcile).
 
 `TESTED_HOSTS` in `src/constants.ts` is the one list of tested OpenCode releases: 2.2.3, 2.2.4 and 2.2.5. The host and pack
 stages, status and CI all take their versions from it. Add a release there, and to the README's requirements, when every
@@ -111,19 +112,24 @@ inputs: in Code Mode each call's signature gives the model the parameter names.
 ### Reconciling with a live tool list
 
 A signed-in connection's `tools/list` is the authority. Save it first, without keeping the credential: an MCP client's
-result for `https://mcp.notion.com/mcp`, as JSON, which also carries Notion's annotations. Keep a saved list out of this
-repository, and read each new or changed description yourself. Then:
+result for `https://mcp.notion.com/mcp`, as JSON, which also carries Notion's annotations and input schemas. Until then,
+`test/unit/notion-live-tools.json` stands in for it, fed from Notion's documentation. **Replacing that file is the
+reconcile step**: put the saved list in its place, then:
 
-1. Make `READ_TOOLS`, `WRITE_TOOLS` and `DENY_TOOLS` name every tool the list has, once each.
-2. A new name is a read only if `readOnlyHint` is true and it neither changes content nor sends anything anywhere. Anything
+1. Run `npm run drift -- --strict`. It names every live tool with no rule, every class or annotation that disagrees with
+   the rules, and every known tool whose input `PARAMETERS` has not recorded, and exits 1 while any of that remains.
+2. Make `READ_TOOLS`, `WRITE_TOOLS` and `DENY_TOOLS` name every tool the list has, once each.
+3. A new name is a read only if `readOnlyHint` is true and it neither changes content nor sends anything anywhere. Anything
    that deletes, trashes, replaces a page's content, changes sharing or permissions, or sends data to Notion's team goes to
    `DENY_TOOLS`. Every other write goes to `WRITE_TOOLS`.
-3. If a read has `readOnlyHint: false`, or a write has `destructiveHint: true`, decide it again and record why in the file's
+4. If a read has `readOnlyHint: false`, or a write has `destructiveHint: true`, decide it again and record why in the file's
    comments.
-4. Update `PARAMETERS` from the schemas, `jelly.tools` in `package.json`, and any skill text that names a changed tool.
-5. Run `npm run check`: the Jelly test fails if `jelly.tools` differs from the lists, the skills test if a skill names a tool
-   or parameter the record does not have, and the docs test if a doc names a tool in no list.
-6. Record the change in `CHANGELOG.md`. Moving a tool between the lists changes the default rules and the tools RPC's
+5. Update `PARAMETERS` from the schemas, `jelly.tools` in `package.json`, and any skill text that names a changed tool. If
+   Notion no longer lists `notion-ai-search`, remove it from `READ_TOOLS`; the rule and the script method go with it.
+6. Run `npm run check`. The live-tools test gives every fixture name exactly one rule and proves every deny is hidden; the
+   Jelly test fails if `jelly.tools` differs from the lists; the skills test fails on a tool or parameter the record does
+   not have; and the docs test on a doc that names a tool in no list.
+7. Record the change in `CHANGELOG.md`. Moving a tool between the lists changes the default rules and the tools RPC's
    methods, which are part of the plugin's contract.
 
 Notion's documentation also lists MCP resources (`notion://docs/memory`, `notion://docs/skills` and others) and a server
