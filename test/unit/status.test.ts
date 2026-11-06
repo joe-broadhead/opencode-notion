@@ -261,9 +261,10 @@ function statusContext(server: string, skills: Promise<unknown> = Promise.resolv
 
 /** A captured account whose reads the test can count and forget. */
 function accountState(account: { workspace?: string; connection?: "person" | "bot" } | undefined) {
-  const state: { current: { workspace?: string; connection?: "person" | "bot" } | undefined; forgotten: number } = { current: account, forgotten: 0 }
+  const state: { current: { workspace?: string; connection?: "person" | "bot" } | undefined; known: boolean; forgotten: number } = { current: account, known: account !== undefined, forgotten: 0 }
   return {
     current: () => state.current,
+    signedIn: () => state.known,
     forget: () => {
       state.forgotten++
       state.current = undefined
@@ -288,8 +289,9 @@ describe("readStatus", () => {
     const account = accountState({ workspace: "Acme Robotics", connection: "person" })
     const status = await readStatus(statusContext("needs_auth"), { host, account })
     expect(account.state.forgotten).toBe(1)
+    // The account is cleared, but the fact that one was read survives: the sign-in worked before.
     expect(status).toMatchObject({ state: "sign_in_required", workspace: null, connection: null, nextStep: `${SIGN_IN} ${REVOKED}` })
-    // With no earlier workspace there was no working sign-in, so the plain step is all there is.
+    // With no earlier read there was no working sign-in, so the plain step is all there is.
     expect(await readStatus(statusContext("needs_auth"), { host })).toMatchObject({ nextStep: SIGN_IN })
   })
 

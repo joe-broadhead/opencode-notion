@@ -96,8 +96,14 @@ export async function watchAccount(
   owned: () => boolean = () => true,
 ) {
   let account: Account | undefined
+  // Survives the clear on `needs_auth`: an account that was read before a challenge means the sign-in worked, so a
+  // revoked grant is the likely cause. A credential switch forgets it, because that is another account.
+  let known = false
   let changedAt = Date.now()
-  const capture = (result: AccountResult) => void (account = accountOf(result) ?? account)
+  const capture = (result: AccountResult) => {
+    account = accountOf(result) ?? account
+    if (account) known = true
+  }
   const hook = await ctx.tool.hook("execute.after", async (event) => {
     if (event.tool === `${SERVER_NAME}_${ACCOUNT_TOOL}` && event.status === "completed" && owned()) capture(event.result)
   })
@@ -115,8 +121,10 @@ export async function watchAccount(
       try {
         const events = ctx.event.subscribe({ types: ["mcp.status.changed", "credential.switched"], signal: stopped.signal })
         for await (const event of events) {
-          if (event.type === "credential.switched") account = undefined
-          else if (event.data.server === SERVER_NAME) {
+          if (event.type === "credential.switched") {
+            account = undefined
+            known = false
+          } else if (event.data.server === SERVER_NAME) {
             changedAt = Date.now()
             await check().catch(() => undefined)
           }
@@ -130,6 +138,8 @@ export async function watchAccount(
 
   return {
     current: () => account,
+    /** True once an account was read in this run, even after a challenge cleared it. */
+    signedIn: () => known,
     /** Forgets the account, for a status read that finds the server signed out. */
     forget: () => void (account = undefined),
     changedAt: () => changedAt,

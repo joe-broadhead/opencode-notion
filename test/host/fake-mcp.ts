@@ -29,8 +29,13 @@ const CATALOG = [...READ_TOOLS.map((name) => tool(name, true)), ...[...WRITE_TOO
 /** The upstream error a "fail" query gets: two lines, the first with a signed URL. */
 export const UPSTREAM_FAILURE = "Notion refused https://www.notion.so/files/a.pdf?signature=fake-signature-123 for this input\nTraceback: second line"
 
-/** The one scope Notion's challenge and metadata name. */
+/** The scope Notion's challenge names, and the only one this plugin ever asks for. */
 export const CHALLENGE_SCOPE = "default"
+/**
+ * Notion's protected-resource metadata advertises both its resource scope and its enterprise-managed authorization
+ * scope. OpenCode falls back to this whole list only when the challenge names no scope: see docs/architecture.md.
+ */
+export const METADATA_SCOPES = [CHALLENGE_SCOPE, "ema_issuer:manage"] as const
 /** The account read's invented answer: a workspace and a person. */
 export const SELF = { object: "user", workspace: { id: "1111", name: "Acme Robotics" }, user: { object: "user", type: "person", id: "2222", name: "Jane Doe" } }
 /**
@@ -42,11 +47,15 @@ export const CLIENT_URL = "https://opencode.ai/oauth/opencode/client.json"
 export interface FakeMcpOptions {
   /** `notion` lists every tool the plugin knows, and the new tool. */
   readonly catalog?: "notion"
+  /** List no tools at all, as a server does for its first seconds after connecting. */
+  readonly emptyTools?: boolean
   /**
    * Whether the token endpoint issues a refresh token. Without one, a 401 later needs a new sign-in and leaves the
    * credential in place.
    */
   readonly refreshTokens?: boolean
+  /** Whether the 401 names a scope. Notion's does; without it OpenCode falls back to every advertised scope. */
+  readonly challengeScope?: boolean
 }
 
 /** The scripted model's id, as the fake's model API lists it. */
@@ -104,7 +113,7 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
       case "initialize":
         return reply({ protocolVersion: message.params?.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: "fake-notion", version: "0.0.0" } })
       case "tools/list":
-        return reply({ tools: options.catalog === "notion" ? CATALOG : TOOLS })
+        return reply({ tools: options.emptyTools ? [] : options.catalog === "notion" ? CATALOG : TOOLS })
       case "tools/call": {
         const name = message.params?.name ?? ""
         calls.push(name)
@@ -146,7 +155,7 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
   const signIn = async (request: IncomingMessage, response: ServerResponse, route: string) => {
     const json = (status: number, body: unknown) => void response.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body))
     if (route.startsWith("/.well-known/oauth-protected-resource")) {
-      return json(200, { resource: fake.url, authorization_servers: [fake.origin], scopes_supported: [CHALLENGE_SCOPE], bearer_methods_supported: ["header"] })
+      return json(200, { resource: fake.url, authorization_servers: [fake.origin], scopes_supported: [...METADATA_SCOPES], bearer_methods_supported: ["header"] })
     }
     if (["/.well-known/oauth-authorization-server", "/.well-known/openid-configuration"].includes(route)) {
       return json(200, {
@@ -157,7 +166,7 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
         grant_types_supported: ["authorization_code", "refresh_token"],
         code_challenge_methods_supported: ["S256"],
         token_endpoint_auth_methods_supported: ["none", "client_secret_basic", "client_secret_post"],
-        scopes_supported: [CHALLENGE_SCOPE],
+        scopes_supported: [...METADATA_SCOPES],
         // Notion advertises this and lists `none`, so OpenCode signs in with its client metadata document.
         client_id_metadata_document_supported: true,
       })
@@ -200,7 +209,7 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
     if (fake.challenge) {
       const metadata = `${fake.origin}/.well-known/oauth-protected-resource/mcp`
       return void response
-        .writeHead(401, { "content-type": "application/json", "www-authenticate": `Bearer resource_metadata="${metadata}", scope="${CHALLENGE_SCOPE}"` })
+        .writeHead(401, { "content-type": "application/json", "www-authenticate": `Bearer resource_metadata="${metadata}"${options.challengeScope === false ? "" : `, scope="${CHALLENGE_SCOPE}"`}` })
         .end(JSON.stringify({ error: "invalid_token" }))
     }
     if (request.method !== "POST") return void response.writeHead(405, { allow: "POST" }).end()

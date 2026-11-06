@@ -108,7 +108,7 @@ export function createNotionPlugin(seam: NotionSeam) {
       // the plugin's; the watcher also notes when the server last changed status.
       const account = await watchAccount(ctx, () => source?.type === "adopted" && source.signIn === "own", owned)
       const own = skills.map((skill) => ({ id: skill.id, path: skill.path }))
-      const read = () => readStatus(ctx, { ...(source ? { source } : {}), host, problems: [...problems.values()], skills: own, account })
+      const read = () => readStatus(ctx, { ...(source ? { source } : {}), host, problems: [...problems.values()], skills: own, account, listing: account })
       await registerSkills(ctx.skill, skills)
       await registerStatusCommand(ctx, read)
       await registerStatusRpc(ctx.rpc, read)

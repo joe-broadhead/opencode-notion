@@ -90,8 +90,9 @@ id that OpenCode loads from another path is named, with a next step to rename or
 sign-in is never shown, and a failure's reason is cut to one line of 160 characters with no URL query.
 
 A sign-in that worked and then needs a new one adds one sentence about a revoked grant, because Notion revokes the whole
-grant when a refresh token is reused. The plugin can tell, because the workspace name is still in memory from a call that
-worked. A status read that finds `needs_auth` forgets it, so a later read gives the plain sign-in step.
+grant when a refresh token is reused. The plugin can tell, because a flag records that an account was read earlier in this
+run and survives the clear that the `needs_auth` event causes; only a credential switch resets it. The workspace name
+itself is forgotten on `needs_auth`, so the Account row says it is not read yet.
 
 - `/notion-status` posts the text with `ctx.session.synthetic` (`resume: false`).
 - The RPC method returns the model to the terminal UI and to scripts, with the fields every plugin of this family shares

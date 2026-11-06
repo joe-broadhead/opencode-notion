@@ -414,6 +414,26 @@ describe("a user notion server that points elsewhere", () => {
   })
 })
 
+// The host lists a server's tools shortly after it connects. For those first seconds, no tools means "still listing",
+// not "none for this account": the admin advice must wait.
+describe("a server that just connected and lists no tools yet", () => {
+  let host: Host
+  beforeAll(async () => {
+    host = await startHost({ fake: { emptyTools: true } })
+  })
+  afterAll(() => host?.close())
+
+  test("is still listing, with no advice to ask an admin", async () => {
+    const output = await statusRpc(host)
+    expect(output).toMatchObject({ state: "connected", tools: 0, deniedTools: [], listing: true })
+    expect(output.nextStep).toBe("Notion is still listing its tools. Run /notion-status again in a few seconds.")
+    const text = await status(host, await session(host))
+    expect(text).toContain("- Tools: none listed yet (Notion is still listing them)")
+    expect(text).toContain("still listing its tools")
+    expect(text).not.toContain("approved list")
+  })
+})
+
 // Notion's server answers 401 with a bearer challenge until the user signs in, or after its grant is revoked. On the
 // host's own MCP client that is a sign-in, not a failure: status says so, with the /connect step.
 describe("a server that asks for a sign-in", () => {
@@ -462,6 +482,11 @@ describe("a server that asks for a sign-in", () => {
       return data.find((item) => item.name === "notion")?.status.status === "connected"
     })
     expect(await until("/connect shows the account", async () => (await connections()).find((item) => item.status?.message === undefined && (item as { type?: string }).type === "credential")))
+    // Read the account while the signed-in connection works, so the later challenge is one that had a working sign-in:
+    // this is the revoked-grant case, which the account clear on needs_auth must not erase.
+    const sessionID = await session(host)
+    await scriptCall(host, ACCOUNT_READ, { sessionID, input: {} })
+    await until("the workspace is read", async () => ((await statusRpc(host)).workspace === "Acme Robotics" ? true : undefined))
     // The tokens stop working: the next connection gets the challenge.
     host.fake.challenge = true
     const mcp = host.client.mcp as unknown as Record<"connect" | "disconnect", (input: object) => Promise<unknown>>
@@ -475,10 +500,15 @@ describe("a server that asks for a sign-in", () => {
     expect(server.status.status).toBe("needs_auth")
     // The plugin marks the /connect account, so the person sees which one to choose there.
     expect(await until("/connect shows the new sign-in on the account", async () => (await connections()).find((item) => item.status?.message === SIGN_IN_AGAIN)))
-    expect(await statusRpc(host)).toMatchObject({ state: "sign_in_required", nextStep: SIGN_IN })
+    const output = await statusRpc(host)
+    expect(output).toMatchObject({ state: "sign_in_required", workspace: null })
+    // The account was cleared by the challenge, but the sign-in had worked: the step names a revoked grant.
+    expect(output.nextStep).toContain(SIGN_IN)
+    expect(output.nextStep).toContain("If this sign-in worked earlier, its grant may have been revoked")
     const text = await status(host, await session(host))
     expect(text).toContain(`- Connection: sign-in required (${host.fake.url}, registered by this plugin)`)
-    expect(text).toContain(`- Next step: ${SIGN_IN}`)
+    expect(text).toContain("- Next step: Run /connect and choose Notion")
+    expect(text).toContain("If this sign-in worked earlier, its grant may have been revoked")
     expect(text).not.toMatch(/authorize|code_challenge/)
     // The same account connects again once Notion answers: the mark is the plugin's, and it clears its own.
     host.fake.challenge = false

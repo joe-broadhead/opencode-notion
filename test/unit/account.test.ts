@@ -44,6 +44,7 @@ function fake() {
   const handlers = new Map<string, (event: unknown) => Promise<void>>()
   const disposed: string[] = []
   let push: (() => void) | undefined
+  let next: { type: string; data: Record<string, unknown> } = { type: "mcp.status.changed", data: { server: "notion" } }
   const ctx = {
     tool: {
       hook: async (name: string, handler: (event: unknown) => Promise<void>) => {
@@ -60,13 +61,23 @@ function fake() {
               push = resolve
               signal.addEventListener("abort", () => resolve(), { once: true })
             })
-            if (!signal.aborted) yield { type: "mcp.status.changed", data: { server: "notion" } }
+            if (!signal.aborted) yield next
           }
         },
       }),
     },
   }
-  return { ctx, handlers, disposed, emit: () => push?.(), settle: () => new Promise((resolve) => setTimeout(resolve, 20)) }
+  return {
+    ctx,
+    handlers,
+    disposed,
+    /** Emits the event `next` was set to. */
+    emit: (event?: { type: string; data: Record<string, unknown> }) => {
+      if (event) next = event
+      push?.()
+    },
+    settle: () => new Promise((resolve) => setTimeout(resolve, 20)),
+  }
 }
 
 describe("watchAccount", () => {
@@ -93,6 +104,24 @@ describe("watchAccount", () => {
     view.emit()
     await view.settle()
     expect(account.changedAt()).toBeGreaterThan(started)
+    await account.stop()
+  })
+
+  // The account is cleared on the needs_auth event before a status read, so the fact that one was read must outlive it.
+  test("remembers that an account was read after the challenge clears it, and forgets that on a credential switch", async () => {
+    const view = fake()
+    const account = await watchAccount(view.ctx as never)
+    expect(account.signedIn()).toBe(false)
+    await view.handlers.get("execute.after")!({ tool: "notion_notion-get-self", status: "completed", result: { output: SELF } })
+    expect(account.signedIn()).toBe(true)
+    view.emit()
+    await view.settle()
+    expect(account.current()).toBeUndefined()
+    expect(account.signedIn()).toBe(true)
+    // Another account: nothing read here describes it.
+    view.emit({ type: "credential.switched", data: {} })
+    await view.settle()
+    expect(account.signedIn()).toBe(false)
     await account.stop()
   })
 })

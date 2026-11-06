@@ -276,6 +276,8 @@ interface ListingState {
 /** The captured account: what the last account read said, and a way to forget it once the user is signed out. */
 export interface AccountState {
   readonly current: () => Account | undefined
+  /** True once an account was read in this run, even after a challenge cleared it: the sign-in worked before. */
+  readonly signedIn: () => boolean
   readonly forget: () => void
 }
 
@@ -298,9 +300,9 @@ export async function readStatus(
     ),
   ])
   const server = servers.data.find((entry) => entry.name === SERVER_NAME)
-  // A server that needs a new sign-in may come back as another workspace. Note whether one was known first, so status
-  // can tell a first sign-in from one that worked and was revoked.
-  const wasSignedIn = server?.status.status === "needs_auth" && facts.account?.current() !== undefined
+  // A server that needs a new sign-in may come back as another workspace. Note whether a workspace was read before, so
+  // status can tell a first sign-in from one that worked and was revoked.
+  const wasSignedIn = server?.status.status === "needs_auth" && facts.account?.signedIn() === true
   if (server?.status.status === "needs_auth") facts.account?.forget()
   const account = facts.account?.current()
   const { skills: own, listing, account: watched, ...rest } = facts
