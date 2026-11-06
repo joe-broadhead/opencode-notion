@@ -29,9 +29,12 @@ async function register(initial: Parameters<typeof mcpEditor>[0] = {}) {
 }
 
 describe("the notion server", () => {
-  test("is Notion's server with no oauth block, so OpenCode uses its client metadata document; no OAuth only for a loopback test", () => {
-    expect(serverConfig(seam)).toEqual({ type: "remote", url: "https://mcp.notion.com/mcp" })
-    expect(Object.hasOwn(serverConfig(seam), "oauth")).toBe(false)
+  test("is Notion's server with its one scope pinned and its client metadata document left to OpenCode; no OAuth only for a loopback test", () => {
+    expect(serverConfig(seam)).toEqual({ type: "remote", url: "https://mcp.notion.com/mcp", oauth: { scope: "default" } })
+    const { oauth } = serverConfig(seam) as { oauth: Record<string, unknown> }
+    // A pinned client_id or redirect_uri would disable OpenCode's client ID metadata document.
+    expect(oauth).not.toHaveProperty("client_id")
+    expect(oauth).not.toHaveProperty("redirect_uri")
     expect(serverConfig({ endpoint: "http://127.0.0.1:1/mcp", oauth: false })).toEqual({ type: "remote", url: "http://127.0.0.1:1/mcp", oauth: false })
   })
 

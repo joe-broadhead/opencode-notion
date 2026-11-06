@@ -1,7 +1,7 @@
 import { Plugin, type Mcp } from "@opencode/plugin"
 import { watchAccount } from "./account.js"
 import { reasonOf } from "./redact.js"
-import { errorText, NAMESPACE_DESCRIPTION, PLUGIN_ID, SERVER_NAME } from "./constants.js"
+import { errorText, NAMESPACE_DESCRIPTION, OAUTH_SCOPE, PLUGIN_ID, SERVER_NAME } from "./constants.js"
 import { checkHost } from "./host-version.js"
 import { registerToolsRpc } from "./host/tools-rpc.js"
 import { watchIntegration } from "./integration.js"
@@ -20,14 +20,15 @@ interface NotionSeam {
 type RemoteConfig = Extract<Mcp.ServerConfig, { type: "remote" }>
 
 /**
- * No protocol, codemode, timeout, headers or `oauth` block: the host defaults apply. Notion's sign-in challenge names
- * its one scope, `default`, and OpenCode requests it as given; a pinned `client_id` or `redirect_uri` would stop it
- * from signing in with its client metadata document. Only the tests' seam sets `oauth: false`.
+ * No protocol, codemode, timeout or headers, and no client_id or redirect_uri: those two would stop OpenCode signing in
+ * with its client metadata document. The scope is pinned, because Notion's metadata also advertises
+ * `ema_issuer:manage`, and OpenCode falls back to every advertised scope when a challenge names none. Only the tests'
+ * seam sets `oauth: false`.
  */
 export const serverConfig = (seam: NotionSeam): RemoteConfig => ({
   type: "remote",
   url: seam.endpoint,
-  ...(seam.oauth === false ? { oauth: false as const } : {}),
+  oauth: seam.oauth ?? { scope: OAUTH_SCOPE },
 })
 
 /** Origin and path only, so a token in a query string never reaches status. */

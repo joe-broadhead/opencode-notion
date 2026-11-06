@@ -39,7 +39,8 @@ version does not update: remove the `@version` from its `plugins` entry first.
 ## Sign in
 
 Run `/connect` and choose **Notion** (it is listed under MCP). In the terminal UI, press `o` or Enter to open the link to
-Notion's sign-in page in your browser, sign in, and choose the workspace to connect. No integration token or API key is
+Notion's sign-in page in your browser, sign in, and choose the workspace to connect. The plugin asks Notion for its one scope, `default`, so there is no
+access level to choose; the permission rules below narrow what the model may do. No integration token or API key is
 needed or used.
 
 From a terminal, run `opencode mcp auth notion` instead; it opens the link automatically. `/mcps` also offers the same

@@ -91,9 +91,18 @@ describe("docs", () => {
     expect(text("README.md")).toContain("No integration token or API key is needed or used.")
     expect(text("docs/configuration.md")).toContain("Notion's server signs in with OAuth")
     expect(text("docs/configuration.md")).toContain('"Authorization": "Bearer {env:NOTION_MCP_TOKEN}"')
-    for (const file of FILES) {
-      expect(text(file)).not.toMatch(/Bearer (?!\{env:)[A-Za-z0-9_-]{8,}|NOTION_API_KEY|"oauth": \{ "scope"/)
-    }
+    for (const file of FILES) expect(text(file)).not.toMatch(/Bearer (?!\{env:)[A-Za-z0-9_-]{8,}|NOTION_API_KEY/)
+  })
+
+  // BUILD-LESSONS, "The scope request": the pin, the fallback it prevents, and the reason it is safe with CIMD.
+  test("the docs pin the one scope, name the wider fallback, and still sign in with the client metadata document", () => {
+    const configuration = text("docs/configuration.md")
+    expect(configuration).toContain('"oauth": { "scope": "default" }')
+    expect(configuration).toContain("ema_issuer:manage")
+    expect(configuration).toContain("falls back to every advertised scope")
+    expect(configuration).toContain("client metadata document")
+    expect(text("README.md")).toContain("asks Notion for its one scope, `default`")
+    expect(text("docs/architecture.md")).toContain("else **every** scope in the protected-resource metadata")
   })
 
   // Once the plugin is removed and OpenCode reloads, `mcp logout notion` finds no server: sign out first.

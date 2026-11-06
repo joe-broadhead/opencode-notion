@@ -36,9 +36,10 @@ for the checks and the release steps.
   unknown tools, plain names only. A status it cannot read is the declared RPC error `unavailable`, with a next step.
   Status makes no Notion call: the workspace name and connection type come only from `notion-get-self` results the model or
   a script asked for.
-- **No `oauth` block.** The registered server is `{ type, url }` only: Notion's sign-in challenge names its one scope,
-  `default`, and OpenCode signs in with its client ID metadata document. A pinned `client_id` or `redirect_uri` disables
-  that. Only the tests' seam sets `oauth: false`.
+- **One pinned scope, no client.** The registered server is `{ type, url, oauth: { scope: "default" } }`: the 401 names
+  that scope, but OpenCode falls back to every advertised scope when a challenge names none, and Notion's metadata also
+  lists the enterprise-managed `ema_issuer:manage`. A pinned `client_id` or `redirect_uri` would disable OpenCode's client
+  ID metadata document. Only the tests' seam sets `oauth: false`.
 - **A user's own server entry** is read for its type, URL and whether `oauth` is `false`, never its `headers`, which may
   hold an MCP token.
 - **`src/notion-tools.ts` is the one record of Notion's tools**, and has no runtime imports. Everything else derives from

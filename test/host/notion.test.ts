@@ -521,8 +521,8 @@ describe("a server that asks for a sign-in", () => {
   })
 })
 
-// The plugin registers the server with no oauth block and no client_id. Notion advertises a client ID metadata document
-// and the `none` auth method, so OpenCode signs in with its own client URL and registers nothing.
+// The plugin pins one scope and no client: Notion advertises a client ID metadata document and the `none` auth method,
+// so OpenCode signs in with its own client URL, asks only `default`, and registers nothing.
 describe("the sign-in OpenCode starts", () => {
   let host: Host
   beforeAll(async () => {
@@ -534,12 +534,10 @@ describe("the sign-in OpenCode starts", () => {
     await notionTools(host)
     host.fake.challenge = true
     const { data: servers } = await host.client.mcp.list({ location: host.location })
-    const integrationID = servers.find((item) => item.name === "notion")?.integrationID
-    expect(integrationID).toBeDefined()
-    const { data: integration } = await host.client.integration.get({ integrationID: integrationID!, location: host.location })
-    const methodID = (integration.methods as { id: string }[])[0]!.id
+    const integrationID = servers.find((item) => item.name === "notion")!.integrationID!
+    const { data: integration } = await host.client.integration.get({ integrationID, location: host.location })
     const oauth = (host.client.integration as unknown as { oauth: Record<"connect" | "cancel", (input: object) => Promise<{ data: { attemptID: string; url: string } }>> }).oauth
-    const { data: attempt } = await oauth.connect({ integrationID, methodID, location: host.location })
+    const { data: attempt } = await oauth.connect({ integrationID, methodID: (integration.methods as { id: string }[])[0]!.id, location: host.location })
     try {
       // The authorization request is issued when the person opens the link; fetch it without following the callback.
       const redirect = await fetch(attempt.url, { redirect: "manual" })
@@ -553,6 +551,34 @@ describe("the sign-in OpenCode starts", () => {
       // Nothing was registered, and no token was exchanged for this attempt's start.
       expect(host.fake.authorizeRequests).toHaveLength(1)
       expect(host.fake.tokens).toHaveLength(0)
+    } finally {
+      await oauth.cancel({ integrationID, attemptID: attempt.attemptID, location: host.location }).catch(() => {})
+    }
+  })
+})
+
+// BUILD-LESSONS, "The scope request": no challenge scope means OpenCode asks for every scope the metadata advertises,
+// which for Notion includes `ema_issuer:manage`. The pin is what keeps the request to `default`; removing it fails here.
+describe("a sign-in whose challenge names no scope", () => {
+  let host: Host
+  beforeAll(async () => {
+    host = await startHost({ oauth: true, fake: { challengeScope: false } })
+  })
+  afterAll(() => host?.close())
+
+  test("still asks for default alone, not the metadata's ema_issuer:manage", async () => {
+    await notionTools(host)
+    host.fake.challenge = true
+    const { data: servers } = await host.client.mcp.list({ location: host.location })
+    const integrationID = servers.find((item) => item.name === "notion")!.integrationID!
+    const { data: integration } = await host.client.integration.get({ integrationID, location: host.location })
+    const oauth = (host.client.integration as unknown as { oauth: Record<"connect" | "cancel", (input: object) => Promise<{ data: { attemptID: string; url: string } }>> }).oauth
+    const { data: attempt } = await oauth.connect({ integrationID, methodID: (integration.methods as { id: string }[])[0]!.id, location: host.location })
+    try {
+      const url = new URL(attempt.url)
+      expect(url.searchParams.get("scope")).toBe(CHALLENGE_SCOPE)
+      // The metadata a real Notion sign-in server publishes. Without the pin this request would carry both scopes.
+      expect((await (await fetch(`${host.fake.origin}/.well-known/oauth-protected-resource/mcp`)).json() as { scopes_supported: string[] }).scopes_supported).toEqual(["default", "ema_issuer:manage"])
     } finally {
       await oauth.cancel({ integrationID, attemptID: attempt.attemptID, location: host.location }).catch(() => {})
     }

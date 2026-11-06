@@ -48,18 +48,20 @@ There is no other option. To narrow what the model may do in Notion, use permiss
 If your config defines no server named `notion`, the plugin registers one:
 
 ```json
-{ "type": "remote", "url": "https://mcp.notion.com/mcp" }
+{ "type": "remote", "url": "https://mcp.notion.com/mcp", "oauth": { "scope": "default" } }
 ```
 
-There is no `oauth` block, and none is needed. Notion's sign-in challenge names its one scope, `default`, and OpenCode
-requests it as given. OpenCode then signs in with its client metadata document, `https://opencode.ai/oauth/opencode/client.json`:
-Notion advertises that it accepts one, so there is no client ID to set and nothing is registered. Adding
-`oauth.client_id` or `oauth.redirect_uri` to the entry would stop that, and there is no reason to. Notion's server signs
-in with OAuth; no integration token or API key is used.
+The scope is pinned to `default`, the one scope a Notion sign-in needs. Notion's 401 names it, but its metadata also
+advertises `ema_issuer:manage`, its enterprise-managed auth scope, and OpenCode falls back to every advertised scope when
+a challenge names none: the pin keeps that fallback from ever asking for more. A pinned `oauth.client_id` or
+`oauth.redirect_uri` would be different, and wrong: either stops OpenCode signing in with its client metadata document,
+`https://opencode.ai/oauth/opencode/client.json`, which Notion advertises that it accepts. So there is no client ID to
+set and nothing is registered. Notion's server signs in with OAuth; no integration token or API key is used.
 
 To change anything else, define `mcp.servers.notion` yourself at Notion's URL. The plugin then **adopts** your entry
-unchanged, and `/notion-status` shows "Connection: connected (…, your own mcp.servers.notion, used unchanged)". The
-permission rules and skills still apply. Of your entry the plugin reads only its type, its URL and whether `oauth` is
+unchanged, and `/notion-status` shows "Connection: connected (…, your own mcp.servers.notion, used unchanged)". Keep the
+`"scope": "default"` it carries: an entry without a scope gets the fallback described above. The permission rules and
+skills still apply. Of your entry the plugin reads only its type, its URL and whether `oauth` is
 `false`; it never reads, copies or reports its `headers`.
 
 ### An MCP token, for a headless machine
