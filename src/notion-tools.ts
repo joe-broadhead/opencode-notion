@@ -56,6 +56,10 @@ export const READ_TOOLS: readonly string[] = [
  * Known writes: they ask before they run. Each changes what someone else can see, or notifies someone: page content and
  * properties, comments and suggested edits, database properties and views, files, calendar events, or the Skills a
  * connection offers.
+ *
+ * `notion-resolve-suggested-edit` carries `destructiveHint: true` in Notion's documentation and stays here rather than
+ * off: it accepts or discards one person's proposal on one page, which a permission prompt can describe, unlike a
+ * whole-page write. Its skill line says to name the author and which of the two the user wants.
  */
 export const WRITE_TOOLS: readonly string[] = [
   "notion-calendar-create-events",

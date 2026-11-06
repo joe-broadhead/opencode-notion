@@ -249,8 +249,9 @@ A script's errors from the tools RPC have their own codes, listed in
   arguments, so `notion-update-page` asks the same way for a property edit and for `replace_content`, which replaces the
   page's body. Read the input in the prompt before saying yes, or deny the tool as [Permissions](#permissions) shows.
 - **The tool table comes from Notion's documentation.** Notion publishes no input schemas and names only three
-  annotations, and this release has not been reconciled with a live tool list. A tool Notion adds, or changes to change
-  data, can run here as a read until a release knows it. `CONTRIBUTING.md` has the check that reconciles the list.
+  annotations, so the tool classes and the parameter names the skills use come from its documentation too, and this
+  release has not been reconciled with a live tool list. A tool Notion adds, or changes to change data, can run here as
+  a read until a release knows it. `CONTRIBUTING.md` has the check that reconciles the list.
 - **One sign-in per workspace.** Notion rotates the refresh token on every use, and reusing one that has been rotated
   away revokes the whole grant. Two separate OpenCode processes on one credential can therefore revoke it for each
   other: run one OpenCode process per sign-in, or sign out and in again when one has revoked it. The sign-in also ends
