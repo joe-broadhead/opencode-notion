@@ -59,7 +59,8 @@ read it rather than guess. Make calls one at a time: every call counts against t
   that source. Do not call `notion-ai-search`: it is the legacy combined search.
 - Elsewhere: Google Docs, Sheets, Drive, Gmail and Google Calendar are `opencode-gws`; Slack is `slack-search`; GitHub
   is `github`; Linear is `linear`; a recording is `granola` or `wisprflow`. A Notion database that tracks issues is
-  still a Notion page.
+  still a Notion page. "What's on my calendar" is the user's Google Calendar: the Notion calendar reads answer a question
+  about Notion Calendar and the events shared there, not the user's own schedule.
 
 ## Personal data
 

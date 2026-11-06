@@ -109,6 +109,7 @@ describe("skills", () => {
     expect(text).toContain("Prefer the user's own plugin for a Slack, Drive, GitHub, Linear or Granola question")
     expect(text).toContain("use the connector search only when the user asks for Notion's connected sources or for \"everything\", and say that the hit came through Notion's connector")
     expect(text).toContain("If the user names Granola or Wispr Flow, that plugin owns the meeting; say which source you read.")
+    expect(text).toContain('"What\'s on my calendar" is the user\'s Google Calendar')
   })
 
   test("notion keeps to the family's rules for answers: signatures, labels, misses, empty results, dates and other sources", () => {
