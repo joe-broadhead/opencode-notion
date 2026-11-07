@@ -86,11 +86,15 @@ Two skills teach the model to use Notion well:
 
 ### Scripts
 
-A script or a cron job can call Notion's read tools with no model, through `opencode api`. It runs as a session and its
-agent, under that agent's permission rules and the session's own. Write tools are never available to scripts:
+A script or a cron job can call every known Notion tool with no model, through `opencode api`. It runs as a session and
+its agent, under that agent's permission rules and the session's own. Only a rule that resolves to `allow` runs: a
+write, whose default rule asks, needs an explicit `allow` in the session's or the agent's rules, and the nine denied
+tools need their deny removed. An `ask` is refused before anything reaches Notion, and a saved "Always allow" does not
+authorise a script.
 
 ```sh
 opencode api post /api/rpc/notion.workspace.tools/notion-search \
+  -H "x-opencode-directory:$PWD" \
   -d '{"input":{"sessionID":"ses_…","input":{…}}}'
 ```
 

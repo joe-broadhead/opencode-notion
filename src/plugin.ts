@@ -3,7 +3,7 @@ import { watchAccount } from "./account.js"
 import { reasonOf } from "./redact.js"
 import { errorText, NAMESPACE_DESCRIPTION, OAUTH_SCOPE, PLUGIN_ID, SERVER_NAME } from "./constants.js"
 import { checkHost } from "./host-version.js"
-import { registerToolsRpc } from "./host/tools-rpc.js"
+import { registerToolsRpc, METHODS } from "./host/tools-rpc.js"
 import { watchIntegration } from "./integration.js"
 import { parseOptions } from "./options.js"
 import { defaultRules, registerDefaultRules } from "./permissions.js"
@@ -114,7 +114,7 @@ export function createNotionPlugin(seam: NotionSeam) {
       await registerStatusCommand(ctx, read)
       await registerStatusRpc(ctx.rpc, read)
       // Scripts call the known reads with no model, as a session and its agent.
-      const stopTools = await registerToolsRpc(ctx, { mcp: { server: SERVER_NAME, managed: () => source?.type !== "conflict" } })
+      const stopTools = await registerToolsRpc(ctx, { methods: METHODS, mcp: { server: SERVER_NAME, managed: () => source?.type !== "conflict" } })
       const stopWatch = watchIntegration(ctx, owned)
       return async () => {
         await stopWatch()

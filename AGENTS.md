@@ -62,9 +62,10 @@ for the checks and the release steps.
   icon: it runs in the `icons` stage of `npm run check`.
 - **TypeScript.** No enums, namespaces or parameter properties. `import type` for types, `.js` in relative imports.
 - **The tools RPC.** `src/host/tools-rpc.ts` is a copy of a module shared by several plugins. Change only its block between
-  the `PLUGIN-SPECIFIC` markers here; change the rest in the shared copy first. Its methods are `READ_TOOLS` and nothing
-  else: never a write, a denied tool or an unknown tool. Keep the RPC id `notion.workspace.tools` and its method names
-  stable, hyphens included: scripts call them by name.
+  the `PLUGIN-SPECIFIC` markers here; change the rest in the shared copy first. Its methods are every known tool in
+  `src/notion-tools.ts`, by exact name and with its class, and never an unknown tool. A write or a denied tool is a
+  method but runs only on a resolved `allow`. Keep the RPC id `notion.workspace.tools` and its method names stable,
+  hyphens included: scripts call them by name.
 - **Tests.** Unit tests use narrow `Pick<Plugin.Context, ...>` fakes. Host tests use the public `@opencode/sdk` with
   `OpenCode.create({ app: { version } })`, a loopback fake server and the temp root from `test/host/isolate.ts`. Every temp
   root of the host and pack tests is a git repository under the system's `/tmp`, never under `TMPDIR` or `HOME`, so OpenCode

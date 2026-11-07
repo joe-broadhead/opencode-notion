@@ -80,17 +80,21 @@ Things to know:
 ## Scripts
 
 The tools RPC (`notion.workspace.tools`, see
-[docs/scripting.md](https://github.com/joe-broadhead/opencode-notion/blob/HEAD/docs/scripting.md)) runs Notion's known read
-tools for a script, with no model. It adds no authority:
+[docs/scripting.md](https://github.com/joe-broadhead/opencode-notion/blob/HEAD/docs/scripting.md)) exposes every known
+Notion tool as a method for a script, with no model, each with a class: read, write or destructive. It adds no authority:
 
-- A script names a session that names an agent, and runs as them. A tool that the agent's or the session's rules hide from
-  the model is refused. OpenCode's own executor then checks the call against the agent's rules, the session's rules and
-  saved approvals, as it does for the model. A session in another directory than the server answering the call runs under
-  the serving location's agent rules, and only a deny is refused in between: the README's known limits say so.
-- An ask on a script's call is denied, not prompted: no one is there to answer it. The plugin's permission hook changes
-  only an ask on one of its own script calls in flight, only to a deny, and leaves every other call alone.
-- Only the known reads are methods. Notion's write tools never are, nor the nine denied tools, nor a tool that Notion adds
-  later, even with an allow rule.
+- A script names a session that names an agent, and runs as them. The rules that decide are the agent's, then the
+  session's, resolved before dispatch: only `allow` runs. An `ask` is refused with no prompt and no Notion call, and a
+  `deny` is refused with no Notion call. A saved "Always allow" is not part of those rules and does not authorise a
+  script; a script's grant is a rule in config, or a Jobs run session.
+- Making a tool a method does not make it reachable. A write's default rule asks, so a script needs an explicit
+  `allow` for its action; the nine denied tools resolve to `deny` and are refused until that deny is changed.
+- OpenCode's own executor still checks an MCP call against the agent's rules, the session's rules and saved approvals.
+  A session in another directory than the server answering the call runs under the serving location's agent rules: the
+  README's known limits say so, and `docs/scripting.md` gives the `x-opencode-directory` header that names the location.
+- An inner ask on a script's call is denied, not prompted. The plugin's permission hook changes only an ask on one of
+  its own script calls in flight, only to a deny, and leaves every other call alone.
+- A tool that Notion adds later is not a method, even with an allow rule; `describe` reports it as unclassified.
 - The call goes through OpenCode's own MCP connection and sign-in. The plugin never sees the token, and returns none.
 - Notion's error text reaches the script only as the first line, at most 300 characters, with tokens and URL query strings
   removed.
