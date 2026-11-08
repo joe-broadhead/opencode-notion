@@ -112,9 +112,17 @@ inputs: in Code Mode each call's signature gives the model the parameter names.
 
 ### Reconciling with a live tool list
 
-A signed-in connection's `tools/list` is the authority. Save it first, without keeping the credential: an MCP client's
-result for `https://mcp.notion.com/mcp`, as JSON, `{ "tools": [ { "name", "description", "inputSchema"?,
-"annotations"? } ] }`. That is the one form this repository and the drift script accept, and
+A signed-in connection's `tools/list` is the authority. **One form, one command.** A saved list is the server's own
+`tools/list` response: `{ "tools": [ { "name", "description", "inputSchema"?, "annotations"? } ] }`, exactly as an MCP
+client prints it. Save it with the MCP Inspector's CLI, which is the command this file names, without keeping the
+credential:
+
+```sh
+npx -y @modelcontextprotocol/inspector --cli https://mcp.notion.com/mcp \
+  --method tools/list --header "Authorization: Bearer $NOTION_TOKEN" > tools-list.json
+```
+
+That is the one form this repository and the drift script accept, and
 `test/unit/notion-live-tools.json` is the same shape, fed from Notion's documentation. **Replacing that file is the
 reconcile step**: put the saved list in its place, then:
 
