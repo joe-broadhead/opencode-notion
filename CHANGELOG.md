@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- Default permission rules after each agent's base allow: every Notion tool is allowed, reads, writes, the nine
+  destructive tools and the Custom Agent sessions alike, and the namespace pattern covers a tool Notion adds later. The
+  `access` option restricts them: `all` (the default), `ask-changes` allows a read and asks for everything else, and
+  `read-only` denies everything but a read.
 - The tools RPC is v2: every known tool is scriptable under a prior explicit allow, each method carries its class,
   `describe` takes a session and reports each method's permission, and `shapeInput` runs beside `shapeResult` so a
   script's call reaches Notion with the model path's arguments. A saved "Always allow" no longer authorises an ad-hoc
@@ -20,10 +24,6 @@ All notable changes to this project are documented here. The format follows [Kee
   sign-in.
 - Adopts your own `mcp.servers.notion` at Notion's URL unchanged, including an entry that carries an MCP token in its
   headers. The plugin never reads those headers. Any other URL, or a local command, is a conflict that status explains.
-- Default permission rules after each agent's base allow: every Notion tool is allowed, reads, writes, the nine
-  destructive tools and the Custom Agent sessions alike, and the namespace pattern covers a tool Notion adds later. The
-  `access` option restricts them: `all` (the default), `ask-changes` allows a read and asks for everything else, and
-  `read-only` denies everything but a read.
 - The workspace name and connection type in status, from the last `notion-get-self` call the model or a script made. The
   plugin makes no call of its own, and reads nothing else of the result.
 - `/notion-status` and the `/notion` dialog ("Notion: Status" in the palette): connection, account, access, tools, agents
