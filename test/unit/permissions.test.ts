@@ -1,43 +1,64 @@
 import { describe, expect, test } from "bun:test"
-import { DENY_TOOLS, READ_TOOLS } from "../../src/notion-tools.js"
-import { defaultRules, evaluate, hasDefaultRules, insertRules, registerDefaultRules, unguardedAgents, type Rule } from "../../src/permissions.js"
+import { DESTRUCTIVE_TOOLS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
+import { ACCESS, defaultRules, effectOf, evaluate, hasDefaultRules, insertRules, registerDefaultRules, unguardedAgents, type Rule } from "../../src/permissions.js"
 import { agentEditor, allow, builtInAgents, transforms, type AgentEditor, type FakeAgent } from "./fake.js"
 
-const ask: Rule = { action: "notion_*", resource: "*", effect: "ask" }
 const deny = (action: string): Rule => ({ action, resource: "*", effect: "deny" })
+const allowAll = (action: string): Rule => ({ action, resource: "*", effect: "allow" })
+const askAll: Rule = { action: "notion_*", resource: "*", effect: "ask" }
 const ACTIONS = ["notion_notion-search", "notion_notion-get-self", "notion_notion-create-comment", "notion_notion-delete-pages", "notion_notion-new-tool", "notion_notion-restore-version"]
 const effects = (rules: readonly Rule[]) => ACTIONS.map((action) => evaluate(rules, action))
 
 describe("defaultRules", () => {
-  test("ask for every Notion tool, then allow each known read, then deny the denied tools last", () => {
-    const rules = defaultRules()
-    expect(rules[0]).toEqual(ask)
-    expect(rules.slice(1, 1 + READ_TOOLS.length)).toEqual(READ_TOOLS.map((tool) => ({ action: `notion_${tool}`, resource: "*", effect: "allow" })))
-    expect(rules.slice(1 + READ_TOOLS.length)).toEqual(DENY_TOOLS.map((tool) => deny(`notion_${tool}`)))
+  // R18: every tool the plugin registers is allowed at the default, the namespace pattern included, so a tool Notion
+  // adds later is usable at once.
+  test("allow everything by default: the namespace pattern, then every tool, reads and changes alike", () => {
+    const rules = defaultRules("all")
+    expect(rules[0]).toEqual(allowAll("notion_*"))
+    expect(rules.slice(1)).toEqual([...READ_TOOLS, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS].map((tool) => allowAll(`notion_${tool}`)))
+    expect(effects([allowAll("*"), ...rules])).toEqual(ACTIONS.map(() => "allow"))
   })
 
-  test("reads allow; deletes and whole-page replacements are denied; every other change asks", () => {
-    expect(effects([allow("*"), ...defaultRules()])).toEqual(["allow", "allow", "ask", "deny", "ask", "deny"])
-    expect(evaluate([allow("*"), ...defaultRules()], "notion_notion-update-page")).toBe("ask")
-    expect(evaluate([allow("*"), ...defaultRules()], "notion_notion-spawn-session")).toBe("deny")
+  test("ask-changes allows a read and asks for everything else, a tool Notion adds included", () => {
+    const rules = defaultRules("ask-changes")
+    expect(rules[0]).toEqual(askAll)
+    expect(effects([allowAll("*"), ...rules])).toEqual(["allow", "allow", "ask", "ask", "ask", "ask"])
+    for (const tool of READ_TOOLS) expect(evaluate(rules, `notion_${tool}`)).toBe("allow")
+    for (const tool of [...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS]) expect(evaluate(rules, `notion_${tool}`)).toBe("ask")
+  })
+
+  test("read-only allows a read and denies everything else, so the destructive class is hidden", () => {
+    const rules = defaultRules("read-only")
+    expect(rules[0]).toEqual(deny("notion_*"))
+    expect(effects([allowAll("*"), ...rules])).toEqual(["allow", "allow", "deny", "deny", "deny", "deny"])
+    for (const tool of DESTRUCTIVE_TOOLS) expect(evaluate(rules, `notion_${tool}`)).toBe("deny")
+  })
+
+  test("the class decides, and the three values cover every class", () => {
+    for (const access of ACCESS) {
+      const changes = access === "all" ? "allow" : access === "ask-changes" ? "ask" : "deny"
+      expect(effectOf("notion-search", access)).toBe("allow")
+      expect(effectOf("notion-create-comment", access)).toBe(changes)
+      expect(effectOf("notion-delete-pages", access)).toBe(changes)
+    }
   })
 
   test("the action is double-prefixed, with the hyphen Notion's own name has kept", () => {
     // A host change that rewrote hyphens would silently unguard every rule: pin the exact string.
     expect(defaultRules()[1]).toEqual({ action: "notion_notion-ai-search", resource: "*", effect: "allow" })
     expect(defaultRules().some((rule) => rule.action === "notion_notion-search")).toBe(true)
-    expect(defaultRules().some((rule) => rule.action === "notion_notion-delete-pages" && rule.effect === "deny")).toBe(true)
+    expect(defaultRules().some((rule) => rule.action === "notion_notion-delete-pages" && rule.effect === "allow")).toBe(true)
   })
 
-  test("the documented opt-in turns a denied tool back into an ask, never an allow", () => {
+  test("a user's later ask turns a destructive tool back on under a restricting value, never an allow of its own", () => {
     const optIn = { action: "notion_notion-delete-pages", resource: "*", effect: "ask" as const }
-    expect(evaluate([allow("*"), ...defaultRules(), optIn], "notion_notion-delete-pages")).toBe("ask")
+    expect(evaluate([allow("*"), ...defaultRules("read-only"), optIn], "notion_notion-delete-pages")).toBe("ask")
   })
 })
 
 describe("insertRules", () => {
-  test("splices the rules right after the base allow, before the agent's own rules", () => {
-    const rules = defaultRules()
+  test.each(ACCESS)("splices the %s block right after the base allow, before the agent's own rules", (access) => {
+    const rules = defaultRules(access)
     for (const agent of builtInAgents()) {
       const before = agent.permissions.slice()
       expect(insertRules(agent.permissions, rules)).toBe(true)
@@ -55,8 +76,8 @@ describe("insertRules", () => {
     expect(insertRules(later, defaultRules())).toBe(false)
   })
 
-  test("only the whole block counts: the ask rule alone is not the block, so the block is added", () => {
-    const own = [allow("*"), { ...ask }, allow("notion_notion-create-comment")]
+  test("only the whole block counts: the namespace rule alone is not the block, so the block is added", () => {
+    const own = [allow("*"), { ...askAll }, allow("notion_notion-create-comment")]
     expect(hasDefaultRules(own)).toBe(false)
     expect(insertRules(own, defaultRules())).toBe(true)
     expect(own.slice(1, 1 + defaultRules().length)).toEqual(defaultRules())
@@ -75,14 +96,14 @@ describe("insertRules", () => {
     insertRules(explore.permissions, defaultRules())
     expect(effects(explore.permissions)).toEqual(["deny", "deny", "deny", "deny", "deny", "deny"])
     insertRules(plan.permissions, defaultRules())
-    expect(effects(plan.permissions)).toEqual(["allow", "allow", "ask", "deny", "ask", "deny"])
+    expect(effects(plan.permissions)).toEqual(ACTIONS.map(() => "allow"))
   })
 
   test("the user's rules come later and win, both ways", () => {
     const permissions = [allow("*")]
     insertRules(permissions, defaultRules())
-    permissions.push(allow("notion_notion-create-comment"), { action: "notion_notion-delete-pages", resource: "*", effect: "ask" }, deny("notion_notion-search*"))
-    expect(effects(permissions)).toEqual(["deny", "allow", "allow", "ask", "ask", "deny"])
+    permissions.push(deny("notion_notion-create-comment"), { action: "notion_notion-delete-pages", resource: "*", effect: "ask" }, deny("notion_notion-search*"))
+    expect(effects(permissions)).toEqual(["deny", "allow", "deny", "ask", "allow", "allow"])
   })
 })
 
@@ -105,31 +126,32 @@ describe("registerDefaultRules", () => {
     await registerDefaultRules({ transform }, defaultRules(), (problem) => problems.push(problem))
     const broken = { ...agentEditor([]), list: () => { throw new Error("boom") } }
     expect(() => run(broken)).not.toThrow()
-    expect(problems).toEqual([
-      "RULES_NOT_ADDED: Notion's default permission rules could not be added (boom), so Notion tools may run without asking. Next step: Restart OpenCode.",
-    ])
+    expect(problems).toEqual(["RULES_NOT_ADDED: Notion's default permission rules could not be added (boom). Next step: Restart OpenCode."])
   })
 })
 
 describe("unguardedAgents", () => {
-  test("names agents with a base allow, no block, and rules that would let a new Notion tool run", () => {
-    const guarded = [allow("*"), ...defaultRules()]
+  test("names no agent under access all, where the block restates the base allow", () => {
+    const agents = [{ id: "reviewer", permissions: [allow("*")] }]
+    expect(unguardedAgents(agents)).toEqual([])
+    expect(unguardedAgents(agents, "all")).toEqual([])
+  })
+
+  test("names agents with a base allow and no block once the access restricts", () => {
+    const guarded = [allow("*"), ...defaultRules("read-only")]
     const agents = [
       { id: "build", permissions: guarded },
       { id: "reviewer", permissions: [allow("*")] },
-      { id: "fixed", permissions: [allow("*"), ...defaultRules(), allow("notion_notion-create-comment")] },
-      { id: "other-plugin-first", permissions: [allow("*"), allow("github_*"), ...defaultRules()] },
-      { id: "block-before-base", permissions: [...defaultRules(), allow("*")] },
-      { id: "ask-rule-only", permissions: [allow("*"), { ...ask }] },
-      { id: "locked", permissions: [allow("*"), deny("*")] },
-      { id: "denies-notion", permissions: [allow("*"), deny("notion_*")] },
+      { id: "fixed", permissions: [allow("*"), ...defaultRules("read-only"), allow("notion_notion-create-comment")] },
+      { id: "other-plugin-first", permissions: [allow("*"), allow("github_*"), ...defaultRules("read-only")] },
+      { id: "block-before-base", permissions: [...defaultRules("read-only"), allow("*")] },
       // An agent whose own rule asks for every Notion tool is already safe: the probe is shaped like one, so it matches.
       { id: "asks-notion-tools", permissions: [allow("*"), { action: "notion_notion-*", resource: "*", effect: "ask" as const }] },
       // No base allow: the plugin adds no rules there, and nothing needs fixing.
       { id: "own-allow-no-base", permissions: [allow("notion_*")] },
     ]
-    expect(unguardedAgents(agents)).toEqual(["reviewer", "block-before-base"])
-    expect(hasDefaultRules(guarded)).toBe(true)
-    expect(hasDefaultRules([...defaultRules()])).toBe(false)
+    expect(unguardedAgents(agents, "read-only")).toEqual(["reviewer", "block-before-base"])
+    expect(hasDefaultRules(guarded, "read-only")).toBe(true)
+    expect(hasDefaultRules([...defaultRules("read-only")], "read-only")).toBe(false)
   })
 })

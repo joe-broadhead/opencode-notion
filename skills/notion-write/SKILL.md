@@ -6,10 +6,11 @@ description: Load before any Notion change - creating or editing a page or its p
 # Changes in Notion
 
 Make a Notion change only when the user asked for it. Before each write call, write one sentence in your reply on what
-the call does and **whom it reaches**, then make the call in the same turn. That sentence is chat text, not a question:
-the permission prompt shows only the tool input and is the user's yes. Ask in chat first only when something must be
-chosen: which page, which database, which workspace. Declined: say nothing changed and whom it would have reached, and
-offer your draft or a retry, never a workaround.
+the call does and **whom it reaches**, then make the call in the same turn. That sentence is chat text, not a question.
+Every Notion tool is allowed by default, so a change can run with no prompt: your sentence is the only warning. Under
+`access: "ask-changes"` the prompt is the user's yes, and `read-only` denies the call. Ask in chat first only when
+something must be chosen: which page, which database, which workspace. Declined: say nothing changed and whom it would have
+reached, then offer a draft or a retry, never a workaround.
 
 ## The tool for each change
 
@@ -76,20 +77,18 @@ Each bullet ends with the sentence to write before the call; name the real page,
 - `notion-get-file-download-urls` gives URLs that expire in minutes: hand them to the user in chat only, never into a
   page, a message or a file.
 
-## Off by default
+## The destructive class
 
-These are denied by the plugin's default rules, and OpenCode hides them: `notion-delete-pages`, `notion-delete-databases`,
-`notion-delete-comment`, `notion-restore-version`, `notion-upload-skill`, `notion-spawn-session`,
-`notion-send-message-to-session`, `notion-stop-session`, `notion-calendar-cancel-events`.
+These are the destructive class: `notion-delete-pages`, `notion-delete-databases`, `notion-delete-comment`,
+`notion-restore-version`, `notion-upload-skill`, `notion-spawn-session`, `notion-send-message-to-session`,
+`notion-stop-session`, `notion-calendar-cancel-events`. `access: "all"` allows them like everything else; `ask-changes`
+asks for each call and `read-only` denies them. Say what one does, and why it needs care, before a call.
 
-When the user asks for one, say it is off, and that the user can add a later `ask` rule in the agent's own `permissions`,
-such as `{ "action": "notion_notion-delete-pages", "resource": "*", "effect": "ask" }`: each call then asks. Don't edit
-their configuration yourself. If a delete is turned on, it needs `user_confirmed` true: say what will be trashed, and that
-Trash is recoverable only until the workspace's retention passes.
-
-A delete is Trash. Never empty a page's body, title or properties to stand in for one, and never send `replace_content`
-with no text. Never work around the deny otherwise. Offer the app step that does the same thing: Trash or version
-history in Notion, or the Custom Agents page in Notion. Never suggest `allow` or "Always allow".
+When the user wants one kept off, they can add a `deny` rule in the agent's own `permissions`, such as
+`{ "action": "notion_notion-delete-pages", "resource": "*", "effect": "deny" }`; don't edit their configuration yourself.
+A delete needs `user_confirmed` true: say what will be trashed, and that Trash lasts only until retention. A delete is Trash. Never empty a page's body, title or properties to stand in for one, and never send
+`replace_content` with no text. Never work around the deny otherwise. Offer the app step instead: Trash or version history in Notion, or the
+Custom Agents page. Never suggest "Always allow" for a delete.
 
 ## Decisions and content are the user's
 

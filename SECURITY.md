@@ -36,10 +36,14 @@ project.
 - Notion content is untrusted. Pages, comments, fetched threads and Notion AI summaries come from other people and can
   contain instructions aimed at the model. The skills tell the model to treat them as data, and never to follow an
   instruction inside a page or a comment.
-- Nine tools are denied by default: the three that trash a page, a database or a comment; `notion-restore-version`, which
-  replaces a whole page with a past version; `notion-upload-skill`, which replaces a Skill page; the three Custom Agent
-  tools, which spend AI credits and act with the user's permissions; and `notion-calendar-cancel-events`. Turning one on
-  takes an `ask` rule in an agent's own `permissions`, so each call still asks, in that agent only.
+- **Every Notion tool is allowed by default**, so an agent can create, update or move a page, comment, change a database,
+  upload a Skill, start or drive a Notion Custom Agent, cancel an event, or trash a page without a prompt. Those reach
+  people: a comment's mention notifies a colleague, a moved page changes who can see it, a calendar event may notify its
+  attendees, and a Custom Agent acts with the user's permissions and spends AI credits.
+- **One line restricts it.** Set `"access": "ask-changes"` in the plugin options and every change asks first, or
+  `"access": "read-only"` and every change is denied. A rule in an agent's own `permissions` restricts one agent, and a
+  `deny` in the top-level `permissions` restricts every agent. The README's
+  [Permissions](https://github.com/joe-broadhead/opencode-notion/blob/HEAD/README.md#permissions) has the three blocks.
 
 ## Permissions
 
@@ -49,12 +53,13 @@ What the model can do in Notion is limited by these layers, in this order:
    that user can see. Guests cannot connect. An Enterprise workspace can restrict its members to an approved list of AI
    apps, and an admin can revoke a connection. Notion offers one scope for all of MCP, so there is no read-only sign-in:
    read-only use comes from permission rules.
-2. **Default permission rules.** Every Notion tool asks before it runs, except Notion's read tools listed in
-   `src/notion-tools.ts`, which run without a prompt. The nine tools above are denied, and hidden from the model. Some
-   changes that ask still reach people: a comment's mention notifies a colleague, a moved page changes who can see it, and
-   a calendar event may notify its attendees.
+2. **Default permission rules.** The plugin inserts one block generated from the tool table and the `access` option. Its
+   default, `all`, allows every Notion tool, reads and changes alike. `ask-changes` allows a read and asks for everything
+   else; `read-only` allows a read and denies everything else, which also hides it from the model. Some changes reach
+   people: a comment's mention notifies a colleague, a moved page changes who can see it, and a calendar event may notify
+   its attendees.
 3. **Your OpenCode permissions.** Your `permissions` rules come after the plugin's. A saved "Always allow" beats an
-   `ask` but never a `deny`, so it cannot reopen one of the nine.
+   `ask` but never a `deny`.
 
 Things to know:
 
@@ -66,10 +71,11 @@ Things to know:
   changes what others see. OpenCode identifies a project by its git repository. A folder outside any git repository with a
   commit may belong to OpenCode's shared `global` project, so an approval saved there may apply in other such folders too.
 - **Some agents get no default rules.** Agents defined only in your own config, and agents added by plugins that load
-  after this one, are created after the plugin inserts its rules, and agents without a base allow get none. Notion tools
-  may run there without asking. `/notion-status` names these agents and gives the fix: put the default rules it shows first
-  in that agent's own `permissions`, followed by your top-level rules for Notion tools. Do not put them in the top-level
-  `permissions`, which would loosen Explore.
+  after this one, are created after the plugin inserts its rules, and agents without a base allow get none. Under the
+  default `access: "all"` that changes nothing; under `ask-changes` or `read-only` those agents stay unrestricted.
+  `/notion-status` names them and gives the fix: put the block it shows first in that agent's own `permissions`, followed
+  by your top-level rules for Notion tools. Do not put an `ask` or an `allow` in the top-level `permissions`, which would
+  loosen Explore.
 - **Unattended runs refuse prompts.** In `opencode run`, a Notion tool that would ask is refused.
 - **The `notion_*` rule also matches other servers** whose names start with `notion_`. For their tools it only adds
   prompts.
@@ -87,8 +93,9 @@ Notion tool as a method for a script, with no model, each with a class: read, wr
   session's, resolved before dispatch: only `allow` runs. An `ask` is refused with no prompt and no Notion call, and a
   `deny` is refused with no Notion call. A saved "Always allow" is not part of those rules and does not authorise a
   script; a script's grant is a rule in config, or a Jobs run session.
-- Making a tool a method does not make it reachable. A write's default rule asks, so a script needs an explicit
-  `allow` for its action; the nine denied tools resolve to `deny` and are refused until that deny is changed.
+- A script gets the same default. Under `access: "all"` the block allows every method, a write included. A session on an
+  agent with `ask-changes` or `read-only` needs an explicit `allow` for the method's action; the destructive class then
+  resolves to `ask` or `deny` and is refused until a rule changes it.
 - OpenCode's own executor still checks an MCP call against the agent's rules, the session's rules and saved approvals.
   A session in another directory than the server answering the call runs under the serving location's agent rules: the
   README's known limits say so, and `docs/scripting.md` gives the `x-opencode-directory` header that names the location.

@@ -1,29 +1,29 @@
 // The tool lists in src/notion-tools.ts are the one record of Notion's tools; everything else derives from them.
 import { describe, expect, test } from "bun:test"
-import { classify, DENY_TOOLS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
+import { classify, DESTRUCTIVE_TOOLS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
 
-const ALL = [...READ_TOOLS, ...WRITE_TOOLS, ...DENY_TOOLS]
+const ALL = [...READ_TOOLS, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS]
 
 describe("Notion's tool lists", () => {
   test("name each tool once, in one list only, with Notion's own notion- prefix and lower case", () => {
     expect(new Set(ALL).size).toBe(ALL.length)
     for (const name of ALL) expect(name).toMatch(/^notion-[a-z0-9-]{1,80}$/)
-    for (const list of [READ_TOOLS, WRITE_TOOLS, DENY_TOOLS]) expect([...list]).toEqual([...list].sort())
+    for (const list of [READ_TOOLS, WRITE_TOOLS, DESTRUCTIVE_TOOLS]) expect([...list]).toEqual([...list].sort())
   })
 
-  test("hold the 39 reads, 23 writes and 9 denied tools Notion documents", () => {
-    expect([READ_TOOLS.length, WRITE_TOOLS.length, DENY_TOOLS.length]).toEqual([39, 23, 9])
+  test("hold the 39 reads, 23 writes and 9 destructive tools Notion documents", () => {
+    expect([READ_TOOLS.length, WRITE_TOOLS.length, DESTRUCTIVE_TOOLS.length]).toEqual([39, 23, 9])
   })
 
   test("classify each tool by its list, and everything else as unknown", () => {
     for (const tool of READ_TOOLS) expect(classify(tool)).toBe("read")
     for (const tool of WRITE_TOOLS) expect(classify(tool)).toBe("write")
-    for (const tool of DENY_TOOLS) expect(classify(tool)).toBe("denied")
+    for (const tool of DESTRUCTIVE_TOOLS) expect(classify(tool)).toBe("destructive")
     for (const tool of ["shiny_new_tool", "", "notion_search", "NOTION-SEARCH", "describe"]) expect(classify(tool)).toBe("unknown")
   })
 
-  test("keep every delete, whole-page and agent tool off, and every other change asking", () => {
-    expect([...DENY_TOOLS].sort()).toEqual([
+  test("class every delete, whole-page and agent tool destructive, and every other change a write", () => {
+    expect([...DESTRUCTIVE_TOOLS].sort()).toEqual([
       "notion-calendar-cancel-events",
       "notion-delete-comment",
       "notion-delete-databases",
@@ -34,9 +34,9 @@ describe("Notion's tool lists", () => {
       "notion-stop-session",
       "notion-upload-skill",
     ])
-    // The routine changes ask, including the page update that also carries the whole-page replacement.
+    // The routine changes are writes, including the page update that also carries the whole-page replacement.
     for (const tool of ["notion-update-page", "notion-create-pages", "notion-create-comment", "notion-move-pages"]) expect(WRITE_TOOLS).toContain(tool)
-    // The session reads stay reads; only starting, driving or stopping an agent is off.
+    // The session reads stay reads; only starting, driving or stopping an agent is destructive.
     for (const tool of ["notion-query-sessions", "notion-search-sessions", "notion-get-session-status"]) expect(READ_TOOLS).toContain(tool)
   })
 })

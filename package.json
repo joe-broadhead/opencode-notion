@@ -90,7 +90,7 @@
   },
   "jelly": {
     "title": "Notion",
-    "summary": "Read and edit your Notion pages, databases and comments, with every change asking.",
+    "summary": "Read and edit your Notion pages, databases and comments, and make changes.",
     "icon": "assets/icon.svg",
     "tools": [
       {
@@ -330,193 +330,193 @@
       {
         "name": "notion.notion-calendar-create-events",
         "permission": "notion_notion-calendar-create-events",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-calendar-update-events",
         "permission": "notion_notion-calendar-update-events",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-convert-page-to-skill",
         "permission": "notion_notion-convert-page-to-skill",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-create-attachment",
         "permission": "notion_notion-create-attachment",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-create-comment",
         "permission": "notion_notion-create-comment",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-create-database",
         "permission": "notion_notion-create-database",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-create-file-upload",
         "permission": "notion_notion-create-file-upload",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-create-folder",
         "permission": "notion_notion-create-folder",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-create-pages",
         "permission": "notion_notion-create-pages",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-create-suggested-edit",
         "permission": "notion_notion-create-suggested-edit",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-create-view",
         "permission": "notion_notion-create-view",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-duplicate-page",
         "permission": "notion_notion-duplicate-page",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-move-pages",
         "permission": "notion_notion-move-pages",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-resolve-suggested-edit",
         "permission": "notion_notion-resolve-suggested-edit",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-restore-pages",
         "permission": "notion_notion-restore-pages",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-set-comment-reaction",
         "permission": "notion_notion-set-comment-reaction",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-set-discussion-resolved",
         "permission": "notion_notion-set-discussion-resolved",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-update-comment",
         "permission": "notion_notion-update-comment",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-update-data-source",
         "permission": "notion_notion-update-data-source",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-update-enabled-skills",
         "permission": "notion_notion-update-enabled-skills",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-update-folder",
         "permission": "notion_notion-update-folder",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-update-page",
         "permission": "notion_notion-update-page",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-update-view",
         "permission": "notion_notion-update-view",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-calendar-cancel-events",
         "permission": "notion_notion-calendar-cancel-events",
-        "effect": "deny",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-delete-comment",
         "permission": "notion_notion-delete-comment",
-        "effect": "deny",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-delete-databases",
         "permission": "notion_notion-delete-databases",
-        "effect": "deny",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-delete-pages",
         "permission": "notion_notion-delete-pages",
-        "effect": "deny",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-restore-version",
         "permission": "notion_notion-restore-version",
-        "effect": "deny",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-send-message-to-session",
         "permission": "notion_notion-send-message-to-session",
-        "effect": "deny",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-spawn-session",
         "permission": "notion_notion-spawn-session",
-        "effect": "deny",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-stop-session",
         "permission": "notion_notion-stop-session",
-        "effect": "deny",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "notion.notion-upload-skill",
         "permission": "notion_notion-upload-skill",
-        "effect": "deny",
+        "effect": "allow",
         "readOnly": false
       }
     ],

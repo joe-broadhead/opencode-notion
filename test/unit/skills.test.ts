@@ -4,11 +4,11 @@
 import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { DENY_TOOLS, PARAMETERS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
+import { DESTRUCTIVE_TOOLS, PARAMETERS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
 import { parseSkill, SKILL_NAMES, SKILLS_DIR } from "../../src/skills.js"
 
 const NAMES = [...SKILL_NAMES]
-const KNOWN = [...READ_TOOLS, ...WRITE_TOOLS, ...DENY_TOOLS]
+const KNOWN = [...READ_TOOLS, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS]
 const MAX_LINES = 100
 // Words from the plugin's own process that mean nothing to the model or the user.
 const JARGON = /manifest|attest|quarantin|acceptance|harness|fixture|\bfork\b|dispatch|lease|catalog|allowlist|capabilit|\bWS-[A-Z0-9]|PLAN\.md|drift|provisional|\bTODO\b|\bevals?\b/i
@@ -177,15 +177,17 @@ describe("skills", () => {
     expect(text).toContain("Load `notion-write` before any create, edit, comment, move, duplicate, database change, file, Notion Calendar event or suggestion decision.")
     // SC-11: history has a call, and restoring an old version is the denied one.
     expect(text).toContain("\"What changed here\" is `notion-get-version-changes`")
-    expect(text).toContain("Putting an old version back is `notion-restore-version`, which is off")
+    expect(text).toContain("Putting an old version back is `notion-restore-version`, which is in the destructive class")
   })
 
-  test("notion-write says what a write does and whom it reaches, then makes the call: the permission prompt is the yes", () => {
+  test("notion-write says what a write does and whom it reaches, then makes the call, with the access values named", () => {
     const text = flat("notion-write")
     expect(text).toMatch(/Before each write call, write one sentence in your reply on what the call does and \*\*whom it reaches\*\*, then make the call in the same turn/)
-    expect(text).toMatch(/That sentence is chat text, not a question: the permission prompt shows only the tool input and is the user's yes/)
+    // R18: the default allows a change, so the sentence is the only warning; ask-changes makes the prompt the yes.
+    expect(text).toMatch(/Every Notion tool is allowed by default, so a change can run with no prompt: your sentence is the only warning/)
+    expect(text).toMatch(/Under `access: "ask-changes"` the prompt is the user's yes, and `read-only` denies the call/)
     expect(text).toMatch(/Ask in chat first only when something must be chosen: which page, which database, which workspace/)
-    expect(text).toMatch(/Declined: say nothing changed and whom it would have reached, and offer your draft or a retry, never a workaround/)
+    expect(text).toMatch(/Declined: say nothing changed and whom it would have reached, then offer a draft or a retry, never a workaround/)
     expect(text).not.toMatch(/wait for a yes|get a yes|only after a yes|wait for (?:the user's )?(?:confirmation|approval)/i)
   })
 
@@ -233,16 +235,17 @@ describe("skills", () => {
     }
   })
 
-  test("notion-write names every denied tool as off, gives the ask rule that turns it on, and never works around it", () => {
-    const off = (read("notion-write").split("## Off by default")[1]?.split("\n## ")[0] ?? "").replace(/\s+/g, " ")
-    for (const name of DENY_TOOLS) expect(off).toContain(`\`${name}\``)
-    expect(off).toContain("the user can add a later `ask` rule in the agent's own `permissions`")
-    expect(off).toContain('{ "action": "notion_notion-delete-pages", "resource": "*", "effect": "ask" }')
-    expect(off).toContain("Don't edit their configuration yourself.")
-    expect(off).toContain("Offer the app step that does the same thing: Trash or version history in Notion, or the Custom Agents page in Notion.")
-    // SC-3: a denied delete is never faked with an emptied page.
+  test("notion-write names every destructive tool, gives the deny rule that keeps one off, and never works around it", () => {
+    const off = (read("notion-write").split("## The destructive class")[1]?.split("\n## ")[0] ?? "").replace(/\s+/g, " ")
+    for (const name of DESTRUCTIVE_TOOLS) expect(off).toContain(`\`${name}\``)
+    expect(off).toContain("they can add a `deny` rule in the agent's own `permissions`")
+    expect(off).toContain('{ "action": "notion_notion-delete-pages", "resource": "*", "effect": "deny" }')
+    expect(off).toContain("don't edit their configuration yourself.")
+    expect(off).toContain("Offer the app step instead: Trash or version history in Notion, or the Custom Agents page.")
+    // SC-3: a delete is never faked with an emptied page.
     expect(off).toContain("A delete is Trash. Never empty a page's body, title or properties to stand in for one, and never send `replace_content` with no text.")
-    expect(off).toMatch(/Never work around the deny otherwise\..*Never suggest `allow` or "Always allow"/)
+    expect(off).toContain("Never work around the deny otherwise.")
+    expect(off).toContain('Never suggest "Always allow" for a delete')
     expect(off).not.toMatch(/"effect": "allow"/)
   })
 

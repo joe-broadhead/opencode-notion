@@ -1,7 +1,10 @@
 # Notion for OpenCode
 
 Search, read and edit your Notion workspace's pages, databases and comments from OpenCode, through Notion's official
-MCP server. Each change asks first.
+MCP server.
+
+Every tool is allowed by default. A change, a delete or a Custom Agent session runs without a prompt unless you restrict
+it, and [Permissions](#permissions) shows the one option that does.
 
 Unofficial; not affiliated with Notion.
 
@@ -18,8 +21,10 @@ Unofficial; not affiliated with Notion.
 - Notion stores workspace data in the United States, unless your Enterprise workspace has been migrated to another
   region.
 - Notion still labels this MCP server beta, so its tools and behaviour can change without notice.
-- The tool table, and which tools read and write, comes from Notion's own documentation. This release has not been
-  reconciled with a live tool list, so treat a tool's class as Notion's description of it, not as its annotation.
+- The 39 read, 23 write and 9 destructive tools, and their classes, come from Notion's own documentation, which gives no
+  input schemas and names only three annotations: treat a class as Notion's description of the tool, not as its
+  annotation. A tool Notion adds is allowed at once under `access: "all"`, and counted as unknown until a release knows
+  it.
 
 ## Install
 
@@ -87,88 +92,364 @@ Two skills teach the model to use Notion well:
 ### Scripts
 
 A script or a cron job can call every known Notion tool with no model, through `opencode api`. It runs as a session and
-its agent, under that agent's permission rules and the session's own. Only a rule that resolves to `allow` runs: a
-write, whose default rule asks, needs an explicit `allow` in the session's or the agent's rules, and the nine denied
-tools need their deny removed. An `ask` is refused before anything reaches Notion, and a saved "Always allow" does not
-authorise a script.
+its agent, under that agent's permission rules and the session's own, and gets the same default: every method runs unless
+the agent restricts. A session on an agent with `access: "ask-changes"` or `read-only` needs an explicit `allow` for the
+method in the session's or the agent's rules. An `ask` is refused before anything reaches Notion, and a saved "Always
+allow" does not authorise a script.
 
 ```sh
 opencode api post /api/rpc/notion.workspace.tools/notion-search \
   -H "x-opencode-directory:$PWD" \
-  -d '{"input":{"sessionID":"ses_…","input":{…}}}'
+  -d '{"input":{"sessionID":"ses_…","input":{}}}'
 ```
 
 See [Scripting](https://github.com/joe-broadhead/opencode-notion/blob/HEAD/docs/scripting.md).
 
 ## Permissions
 
-The plugin adds these rules to every agent, directly after the agent's base rule that allows everything:
+**Every tool is allowed by default.** The plugin adds one block to every agent, right after the agent's base rule that
+allows everything, and that block allows Notion's tools: reads, writes, the nine that delete or replace a page, and the
+Custom Agent sessions alike. An agent can therefore create, update or move a page, comment, change a database, upload a
+Skill, start a Notion agent or cancel an event without a prompt. `/notion` and `/notion-status` show the block, the
+access value and the tools involved.
 
-1. `{ "action": "notion_*", "resource": "*", "effect": "ask" }`: every Notion tool asks, including tools Notion adds
-   later.
-2. One `allow` rule for each of Notion's 39 read tools, listed in
-   [`src/notion-tools.ts`](https://github.com/joe-broadhead/opencode-notion/blob/HEAD/src/notion-tools.ts). These run
-   without a prompt.
-3. Nine `deny` rules, for tools that are off until you turn them on. A deny also hides the tool from the model.
-   - `{ "action": "notion_notion-delete-pages", "resource": "*", "effect": "deny" }`: it trashes a page that everyone
-     with access can see.
-   - `{ "action": "notion_notion-delete-databases", "resource": "*", "effect": "deny" }`: the same, for a database.
-   - `{ "action": "notion_notion-delete-comment", "resource": "*", "effect": "deny" }`: the same, for a comment.
-   - `{ "action": "notion_notion-restore-version", "resource": "*", "effect": "deny" }`: it replaces a whole page with a
-     past version, losing every later edit, including other people's, and the comments added since.
-   - `{ "action": "notion_notion-upload-skill", "resource": "*", "effect": "deny" }`: it replaces a Skill page's title,
-     Description, body and Files.
-   - `{ "action": "notion_notion-spawn-session", "resource": "*", "effect": "deny" }`: it starts a Notion Custom Agent
-     that acts in the workspace with your permissions and spends AI credits.
-   - `{ "action": "notion_notion-send-message-to-session", "resource": "*", "effect": "deny" }`: it sends a message to
-     that agent.
-   - `{ "action": "notion_notion-stop-session", "resource": "*", "effect": "deny" }`: it stops that agent, ending work
-     someone may be waiting on.
-   - `{ "action": "notion_notion-calendar-cancel-events", "resource": "*", "effect": "deny" }`: it removes an event from
-     other people's calendars and may notify them.
+There are three ways to restrict it.
 
-   To turn one on for an agent, add a rule that makes it **ask** to that agent's own `permissions`, which come after the
-   plugin's block. For the build agent:
-
-   ```json
-   {
-     "agents": {
-       "build": {
-         "permissions": [{ "action": "notion_notion-delete-pages", "resource": "*", "effect": "ask" }]
-       }
-     }
-   }
-   ```
-
-   Not in the top-level `permissions`: a top-level rule reaches every agent, Explore included. Never make a denied tool
-   `allow`, and don't answer "Always allow" for it: that would save an allow for every agent in the project.
-
-So reads run, and the 23 write tools ask before they run. Each change reaches people: everyone with access to the page or
-database; colleagues a comment mentions, who are notified; the people whose access changes when a page moves; and the
-attendees a calendar event may notify. `notion-write` says so before each call.
-
-**A permission rule matches a tool's name, not its arguments.** `notion-update-page` is the commonest change and stays at
-`ask`, although it also carries `replace_content`, which replaces a page's whole body. No rule can tell the two apart, so
-the guard is `notion-write`'s: edit through `update_content` with text copied from a fetch, and never send
-`replace_content` unless the user explicitly asked to replace the whole page. Read the input shown in the permission
-prompt before you answer yes. To remove that path entirely, deny the tool, in your own `permissions` or an agent's:
+### 1. The `access` option
 
 ```json
-{ "permissions": [{ "action": "notion_notion-update-page", "resource": "*", "effect": "deny" }] }
+{
+  "plugins": [
+    { "package": "@joe-broadhead/opencode-notion", "options": { "access": "ask-changes" } }
+  ]
+}
+```
+
+| `access` | What runs |
+| --- | --- |
+| `all` (the default) | every Notion tool runs without a prompt |
+| `ask-changes` | a read runs; every other tool asks, including one Notion adds later |
+| `read-only` | a read runs; every other tool is denied, and hidden from the model |
+
+The block is generated from the tool table and the value, so `/notion` always shows what is in force. The three
+blocks:
+
+#### `all` (the default)
+
+The plugin adds these rules for `access: "all"`:
+
+```json
+[
+    { "action": "notion_*", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-ai-search", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-list-calendar-resources", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-list-calendars", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-list-contacts", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-list-coworkers-events", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-list-events", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-connector-search", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-download-attachment", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-download-skill", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-fetch", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-async-task", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-comments", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-enabled-skills", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-file-download-urls", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-groups", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-self", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-session-status", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-suggested-edit", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-teams", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-tool-access", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-users", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-version-changes", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-favorite-pages", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-page-backlinks", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-private-pages", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-recent-pages", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-session-events", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-shared-pages", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-memory-search", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-query-data-sources", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-query-meeting-notes", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-query-multiple-data-sources", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-query-sessions", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-read-session-event", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-search", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-search-agents", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-search-sessions", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-view-version", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-wait-session", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-create-events", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-update-events", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-convert-page-to-skill", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-create-attachment", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-create-comment", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-create-database", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-create-file-upload", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-create-folder", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-create-pages", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-create-suggested-edit", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-create-view", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-duplicate-page", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-move-pages", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-resolve-suggested-edit", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-restore-pages", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-set-comment-reaction", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-set-discussion-resolved", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-update-comment", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-update-data-source", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-update-enabled-skills", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-update-folder", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-update-page", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-update-view", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-cancel-events", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-delete-comment", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-delete-databases", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-delete-pages", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-restore-version", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-send-message-to-session", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-spawn-session", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-stop-session", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-upload-skill", "resource": "*", "effect": "allow" }
+]
+```
+
+#### `ask-changes`
+
+The plugin adds these rules for `access: "ask-changes"`:
+
+```json
+[
+    { "action": "notion_*", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-ai-search", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-list-calendar-resources", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-list-calendars", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-list-contacts", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-list-coworkers-events", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-list-events", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-connector-search", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-download-attachment", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-download-skill", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-fetch", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-async-task", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-comments", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-enabled-skills", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-file-download-urls", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-groups", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-self", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-session-status", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-suggested-edit", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-teams", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-tool-access", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-users", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-version-changes", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-favorite-pages", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-page-backlinks", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-private-pages", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-recent-pages", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-session-events", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-shared-pages", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-memory-search", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-query-data-sources", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-query-meeting-notes", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-query-multiple-data-sources", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-query-sessions", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-read-session-event", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-search", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-search-agents", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-search-sessions", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-view-version", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-wait-session", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-create-events", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-calendar-update-events", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-convert-page-to-skill", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-create-attachment", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-create-comment", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-create-database", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-create-file-upload", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-create-folder", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-create-pages", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-create-suggested-edit", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-create-view", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-duplicate-page", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-move-pages", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-resolve-suggested-edit", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-restore-pages", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-set-comment-reaction", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-set-discussion-resolved", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-update-comment", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-update-data-source", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-update-enabled-skills", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-update-folder", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-update-page", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-update-view", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-calendar-cancel-events", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-delete-comment", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-delete-databases", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-delete-pages", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-restore-version", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-send-message-to-session", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-spawn-session", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-stop-session", "resource": "*", "effect": "ask" },
+    { "action": "notion_notion-upload-skill", "resource": "*", "effect": "ask" }
+]
+```
+
+#### `read-only`
+
+The plugin adds these rules for `access: "read-only"`:
+
+```json
+[
+    { "action": "notion_*", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-ai-search", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-list-calendar-resources", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-list-calendars", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-list-contacts", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-list-coworkers-events", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-list-events", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-connector-search", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-download-attachment", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-download-skill", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-fetch", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-async-task", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-comments", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-enabled-skills", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-file-download-urls", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-groups", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-self", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-session-status", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-suggested-edit", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-teams", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-tool-access", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-users", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-get-version-changes", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-favorite-pages", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-page-backlinks", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-private-pages", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-recent-pages", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-session-events", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-list-shared-pages", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-memory-search", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-query-data-sources", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-query-meeting-notes", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-query-multiple-data-sources", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-query-sessions", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-read-session-event", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-search", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-search-agents", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-search-sessions", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-view-version", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-wait-session", "resource": "*", "effect": "allow" },
+    { "action": "notion_notion-calendar-create-events", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-calendar-update-events", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-convert-page-to-skill", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-create-attachment", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-create-comment", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-create-database", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-create-file-upload", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-create-folder", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-create-pages", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-create-suggested-edit", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-create-view", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-duplicate-page", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-move-pages", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-resolve-suggested-edit", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-restore-pages", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-set-comment-reaction", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-set-discussion-resolved", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-update-comment", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-update-data-source", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-update-enabled-skills", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-update-folder", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-update-page", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-update-view", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-calendar-cancel-events", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-delete-comment", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-delete-databases", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-delete-pages", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-restore-version", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-send-message-to-session", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-spawn-session", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-stop-session", "resource": "*", "effect": "deny" },
+    { "action": "notion_notion-upload-skill", "resource": "*", "effect": "deny" }
+]
 ```
 
 The tool names are double-prefixed, because Notion's own names start `notion-`: `notion-search` becomes
 `notion_notion-search`, and in Code Mode `tools["notion"]["notion-search"]`.
 
-Everything that comes later than these rules still wins: an agent's own stricter rules (Explore cannot use Notion) and
-your `permissions` in `opencode.json`. A saved "Always allow" beats an `ask` but never a `deny`. In an unattended run such
-as `opencode run`, a tool that asks is refused.
+### 2. An agent's own rules
 
-Agents that exist only in your own config, and agents added by plugins that load later, are created after the plugin adds
-its rules, so Notion tools run there without asking. `/notion-status` and `/notion` name those agents and show the default
-rules to put first in each one's own `permissions`. Do not put them in the top-level `permissions`, which would loosen
-Explore. [Configuration](https://github.com/joe-broadhead/opencode-notion/blob/HEAD/docs/configuration.md#permissions) has
-a worked example and permission recipes.
+A rule in an agent's own `permissions` comes after the plugin's block, so it wins for that agent. A read-only agent
+that keeps Notion's reads and asks for one change:
+
+```json
+{
+  "agents": {
+    "build": {
+      "permissions": [
+        { "action": "notion_*", "resource": "*", "effect": "ask" },
+        { "action": "notion_notion-search", "resource": "*", "effect": "allow" },
+        { "action": "notion_notion-fetch", "resource": "*", "effect": "allow" },
+        { "action": "notion_notion-create-comment", "resource": "*", "effect": "ask" }
+      ]
+    }
+  }
+}
+```
+
+### 3. A per-tool rule
+
+Every action is `notion_` followed by the tool's name. A later rule wins, so this denies one tool in the top-level
+`permissions`, for every agent:
+
+```json
+{
+  "permissions": [
+    { "action": "notion_notion-delete-pages", "resource": "*", "effect": "deny" }
+  ]
+}
+```
+
+The nine destructive tools, and why they deserve their own sentence:
+
+- `notion_notion-delete-pages`, `notion_notion-delete-databases` and `notion_notion-delete-comment` trash something
+  everyone with access can see.
+- `notion_notion-restore-version` replaces a whole page with a past version, losing every later edit, including other
+  people's, and the comments added since.
+- `notion_notion-upload-skill` replaces a Skill page's title, Description, body and Files.
+- `notion_notion-spawn-session`, `notion_notion-send-message-to-session` and `notion_notion-stop-session` start, drive or
+  stop a Notion Custom Agent that acts in the workspace with your permissions and spends AI credits.
+- `notion_notion-calendar-cancel-events` removes an event from other people's calendars and may notify them.
+
+### What each change reaches
+
+Say what a change does and whom it reaches before you make it. Each change reaches people: everyone with access to the
+page or database; colleagues a comment mentions, who are notified; the people whose access changes when a page moves;
+and the attendees a calendar event may notify. `notion-write` says so before each call.
+
+**A permission rule matches a tool's name, not its arguments.** `notion-update-page` is the commonest change, and it also
+carries `replace_content`, which replaces a page's whole body. No rule can tell the two apart, so the guard is
+`notion-write`'s: edit through `update_content` with text copied from a fetch, and never send `replace_content` unless
+the user explicitly asked to replace the whole page. With `ask-changes` or `read-only` a rule cannot see the argument
+either, so read the input shown in the prompt before you answer yes, or deny the tool entirely:
+
+```json
+{ "permissions": [{ "action": "notion_notion-update-page", "resource": "*", "effect": "deny" }] }
+```
+
+Everything that comes later than these rules still wins: an agent's own stricter rules (Explore cannot use Notion),
+your `permissions` in `opencode.json`, and your saved "Always allow" answers. A saved "Always allow" beats an `ask` but
+never a `deny`. In an unattended run such as `opencode run`, a tool that asks is refused.
+
+Agents that exist only in your own config, and agents added by plugins that load later, are created after the plugin
+adds its rules, so they get no block. With `access: "all"` that changes nothing; with `ask-changes` or `read-only` they
+stay unrestricted, and `/notion-status` and `/notion` name them with the block to put first in each one's own
+`permissions`. Do not put an `ask` or an `allow` in the top-level `permissions`, which would reach every agent, Explore
+included. [Configuration](https://github.com/joe-broadhead/opencode-notion/blob/HEAD/docs/configuration.md#permissions)
+has a worked example and permission recipes.
 
 ## Configure
 
@@ -182,6 +463,7 @@ Set options with the object form of the plugin entry:
 
 | Option | Values | Default | Effect |
 | --- | --- | --- | --- |
+| `access` | `"all"`, `"ask-changes"` or `"read-only"` | `"all"` | How much the default rules restrict; see [Permissions](#permissions). |
 | `allowUntestedHost` | `true` or `false` | `false` | Starts on an OpenCode version outside `>=2.2.3 <2.3.0`, with a warning in status. |
 
 [docs/configuration.md](https://github.com/joe-broadhead/opencode-notion/blob/HEAD/docs/configuration.md) has the details,
@@ -223,8 +505,8 @@ Run `/notion-status` first. Its last line is the next step.
 | Notion refuses the sign-in | Guests cannot connect. An Enterprise workspace may restrict AI apps to an approved list: ask an admin to add OpenCode under `Settings` → `Connections` → `Permissions` → **AI apps**. |
 | Tools: none listed yet | Notion connected moments ago and is still listing its tools. Run `/notion-status` again, or press `r` in the dialog, in a few seconds. |
 | Tools: 0 available | Notion lists no tools for this connection. Ask an admin whether AI apps are restricted to an approved list, then sign in again. |
-| Tools: off by default | The tools the default rules deny, listed by name. See [Permissions](#permissions) to turn one on, as an ask. |
-| Tools: unknown | Notion added tools the plugin does not know yet. They ask before they run. A known tool missing from the count is normal: a plan or an admin-chosen tool list may leave it out. |
+| Tools: allowed like everything else, ask or denied | The listed tools are the destructive class. What happens to them follows the `access` value. See [Permissions](#permissions). |
+| Tools: unknown | Notion added tools the plugin does not know yet. Under `access: "all"` they run at once, `ask-changes` asks, and `read-only` denies them. A known tool missing from the count is normal: a plan or an admin-chosen tool list may leave it out. |
 | Access: default rules missing or not added | Some agents lack the default rules (see the agents row), or OpenCode could not add them (see the OpenCode row). Follow the next step. |
 | Account: not read yet | Nothing is wrong: the row fills in after the first `notion-get-self` call the model or a script makes. The plugin makes no call of its own. |
 | A tool says it needs an upgrade | That tool needs a higher plan, or Notion AI: connected-source search and SQL across data sources need Business or Enterprise with Notion AI, and meeting notes need Business with Notion AI. |
@@ -235,7 +517,7 @@ Run `/notion-status` first. Its last line is the next step.
 | Agents without default rules | Put the default rules shown by `/notion-status` first in each listed agent's own permissions, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for Notion tools. |
 | OpenCode: untested | OpenCode is not 2.2.3, 2.2.4, 2.2.5 or 2.2.6. Inside `>=2.2.3 <2.3.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If Notion misbehaves, use a tested release. |
 | Signed in to the wrong workspace | Run `opencode mcp logout notion` (or remove the account in `/connect` → Notion), then sign in again. Run it from the project folder where the plugin is installed, or remove the account in `/connect` → **Notion**. If it answers `MCP server not found: notion`, OpenCode is still opening that folder: wait a few seconds and run it again. |
-| A Notion tool is refused in `opencode run` | Nobody could answer its prompt. A read runs if you add an `allow` rule for it to the agent's own `permissions`. A write needs an interactive session: this plugin documents no `allow` for one, and a saved one would run it unasked in every agent of the project. |
+| A Notion tool is refused in `opencode run` | Nobody could answer its prompt. Add an `allow` rule for that tool to the agent's own `permissions`, or use `access: "all"`. |
 | A skill seems ignored, and status names a skill to rename or move | A skill of yours with the same id, such as `notion`, replaces the plugin's. Rename or move it. |
 | `/notion` is missing | The plugin did not start. Run `/plugins` to see the error. |
 | `OPTIONS_INVALID` | An option is unknown or has a wrong value. The message names the option and the accepted values. |
@@ -243,10 +525,39 @@ Run `/notion-status` first. Its last line is the next step.
 | `STATUS_UNAVAILABLE` | The status could not be read, or the plugin is not running. Follow the next step in the message. |
 | `SKILLS_INVALID` | A skill file in the package is missing or broken. Reinstall the plugin. |
 | `SERVER_NOT_REGISTERED` | The plugin could not register the `notion` server. Restart OpenCode. |
-| `RULES_NOT_ADDED` | The default permission rules could not be added, so Notion tools may run without asking. Restart OpenCode. |
+| `RULES_NOT_ADDED` | The default permission rules could not be added. Restart OpenCode. |
 
 A script's errors from the tools RPC have their own codes, listed in
 [Scripting](https://github.com/joe-broadhead/opencode-notion/blob/HEAD/docs/scripting.md#errors).
+
+## Errors
+
+Every error reads `CODE: What happened. Next step: What to do.` The codes are the plugin's own one table. `setup` and
+`status` codes come from the plugin; `rpc` codes are a refusal from the tools RPC for scripts, which
+[Scripting](https://github.com/joe-broadhead/opencode-notion/blob/HEAD/docs/scripting.md#errors) explains in detail.
+
+| Code | Surface | When |
+| --- | --- | --- |
+| `HOST_UNTESTED` | setup | OpenCode is outside the supported range and `allowUntestedHost` is not set. |
+| `OPTIONS_INVALID` | setup | An option is unknown or has a wrong value. |
+| `SKILLS_INVALID` | setup | A skill file is missing or broken; the plugin still starts. |
+| `SERVER_NOT_REGISTERED` | setup | The `notion` server could not be registered. |
+| `RULES_NOT_ADDED` | setup | The default permission rules could not be added. |
+| `STATUS_UNAVAILABLE` | status | The status could not be read, or the plugin is not running. |
+| `SESSION_UNKNOWN` | rpc | The session does not exist in this location. |
+| `SESSION_AGENT_REQUIRED` | rpc | The session names no agent, or one that does not exist. |
+| `PERMISSION_DENIED` | rpc | The last matching rule is an `ask` or a `deny`; refused before dispatch. |
+| `SERVER_CONFLICT` | rpc | `mcp.servers.notion` is defined at another URL. |
+| `AUTH_REQUIRED` | rpc | The `notion` server needs a sign-in. |
+| `CONNECTING` | rpc | The `notion` server is still connecting. |
+| `CONNECTION_FAILED` | rpc | The `notion` server could not connect. |
+| `DISABLED` | rpc | The `notion` server is disabled. |
+| `NOT_REGISTERED` | rpc | The `notion` server is not registered. |
+| `TOOL_UNAVAILABLE` | rpc | The server is connected but OpenCode does not list the tool. |
+| `UPSTREAM_ERROR` | rpc | Notion answered with an error, such as an invalid input or a rate limit. |
+| `CANCELLED` | rpc | The request was cancelled. |
+
+The status RPC's own error is `unavailable`, with a next step, when the status cannot be read.
 
 ## Known limits
 
@@ -254,11 +565,11 @@ A script's errors from the tools RPC have their own codes, listed in
   arguments, so `notion-update-page` asks the same way for a property edit and for `replace_content`, which replaces the
   page's body. Read the input in the prompt before saying yes, or deny the tool as [Permissions](#permissions) shows.
 - **The tool table comes from Notion's documentation.** Notion publishes no input schemas and names only three
-  annotations, so the tool classes and the parameter names the skills use come from its documentation too, and this
-  release has not been reconciled with a live tool list. `test/unit/notion-live-tools.json` stands in for it until then,
-  and `npm run drift` is the check that reconciles it: save the signed-in list over the fixture and run
-  `npm run drift -- --strict`. A tool Notion adds, or changes to change data, can run here as a read until a release knows
-  it. `CONTRIBUTING.md` has the work.
+  annotations, so the tool classes and the parameter names the skills use come from its documentation too. A tool
+  Notion adds is allowed at once and counted as unknown; a tool Notion changes to change data can run here as a read
+  until a release knows it. `test/unit/notion-live-tools.json` is a raw `tools/list` response, and `npm run drift` is
+  the check that reconciles the table with a saved one: replace the file and run `npm run drift -- --strict`.
+  `CONTRIBUTING.md` has the work.
 - **One sign-in per workspace.** Notion rotates the refresh token on every use, and reusing one that has been rotated
   away revokes the whole grant. Two separate OpenCode processes on one credential can therefore revoke it for each
   other: run one OpenCode process per sign-in, or sign out and in again when one has revoked it. The sign-in also ends
@@ -270,8 +581,7 @@ A script's errors from the tools RPC have their own codes, listed in
   answering it, and the read then runs under the serving location's agent rules; only a `deny` is refused in between. Run
   scripts in the project whose agent you mean. This is in the module shared with the other plugins, not in this one.
 - **In Jelly, a tool Notion adds is not asked about.** Jelly applies each declared tool's effect and nothing else, so an
-  undeclared tool, a write included, runs without asking until a release of this plugin declares it. A Jelly admin can set
-  it to ask.
+  undeclared tool, a write included, runs with the plugin's own default. A Jelly admin can set it to ask.
 
 ## Uninstall
 

@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test"
 import { checkHost } from "../../src/host-version.js"
 import { defaultRules } from "../../src/permissions.js"
-import { buildStatus, formatStatus, readStatus, registerStatusCommand, registerStatusRpc, shortReason, StatusRpc, type Status, type StatusContext, type StatusFacts } from "../../src/status.js"
+import { buildStatus, formatStatus, readStatus, registerStatusCommand, registerStatusRpc, StatusRpc, type Status, type StatusContext, type StatusFacts } from "../../src/status.js"
+import { shortReason } from "../../src/redact.js"
 import { VERSION } from "../../src/version.js"
-import { DENY_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
+import { DESTRUCTIVE_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
 import { allow } from "./fake.js"
 
 const SIGN_IN = "Run /connect and choose Notion, then press o or Enter to open the link (in a terminal, opencode mcp auth notion opens it automatically: run it from the project folder where the plugin is installed, and if it answers MCP server not found: notion, wait a few seconds and run it again)."
@@ -20,16 +21,17 @@ describe("the sign-in and sign-out caveat", () => {
 const REVOKED =
   "If this sign-in worked earlier, its grant may have been revoked: Notion revokes the whole grant when a refresh token is reused, which two OpenCode processes sharing one sign-in do. Run opencode mcp logout notion from the project folder where the plugin is installed, or remove the account in /connect → Notion; if it answers MCP server not found: notion, wait a few seconds and run it again, then sign in once."
 const NOTHING_TO_DO = "Nothing to do."
-/** The default rules as /notion-status shows them: one rule a line, a JSON array body. */
-const AGENT_RULES = defaultRules().map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`).join("\n")
+/** The default rules as /notion-status shows them: one rule a line, a JSON array body, for `access`. */
+const agentRuleList = (access: "all" | "ask-changes" | "read-only") => defaultRules(access).map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`).join("\n")
 
 const host = checkHost("2.2.3", false)
 const URL = "https://mcp.notion.com/mcp"
 const base: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: URL, signIn: "oauth" }, host, tools: ["notion-search"] }
 const guarded = { id: "build", permissions: [allow("*"), ...defaultRules()] }
-const RULES = "no agent runs new Notion tools unasked"
-const POSTURE = `reads run without asking; the ${WRITE_TOOLS.length} changes and any new tool ask first; the ${DENY_TOOLS.length} that delete, replace a whole page, upload a Skill, drive a Notion agent or cancel an event are off`
-const ACCESS = `${POSTURE}; ${RULES}`
+const guardedFor = (access: "all" | "ask-changes" | "read-only") => ({ id: "build", permissions: [allow("*"), ...defaultRules(access)] })
+const RULES = "every agent has the block"
+const POSTURE = "every Notion tool is allowed, reads and changes alike"
+const ACCESS = `access all: ${POSTURE}`
 
 describe("buildStatus", () => {
   test("connected, with the workspace read, and nothing left to do", () => {
@@ -37,11 +39,13 @@ describe("buildStatus", () => {
     expect(status).toEqual({
       version: VERSION,
       state: "connected",
+      access: "all",
       source: { type: "plugin", url: URL, signIn: "oauth" },
       workspace: "Acme Robotics",
       connection: "person",
       beta: true,
       tools: 1,
+      destructiveTools: [],
       deniedTools: [],
       listing: false,
       unknownCount: 0,
@@ -56,7 +60,7 @@ describe("buildStatus", () => {
         "Notion status",
         "- Connection: connected (https://mcp.notion.com/mcp, registered by this plugin)",
         "- Account: Acme Robotics",
-        `- Access: ${POSTURE}; your Notion account; ${RULES}`,
+        `- Access: ${ACCESS}; your Notion account; ${RULES}`,
         "- Server: Notion MCP (Beta): Notion may change its tools and behaviour",
         "- Tools: 1 available, 0 unknown",
         "- Agents without default rules: none",
@@ -71,13 +75,13 @@ describe("buildStatus", () => {
     expect(status).toMatchObject({ workspace: null, connection: null })
     const text = formatStatus(status)
     expect(text).toContain("- Account: not read yet: it appears after a notion-get-self call\n")
-    expect(text).toContain(`- Access: ${ACCESS}\n`)
+    expect(text).toContain(`- Access: ${ACCESS}; ${RULES}\n`)
     expect(text).not.toContain("your Notion account")
   })
 
   test("a workspace connection says its tool list is the admin's", () => {
     expect(formatStatus(buildStatus({ ...base, account: { workspace: "Acme Robotics", connection: "bot" } }))).toContain(
-      `- Access: ${POSTURE}; a workspace connection with an admin-chosen tool list; ${RULES}\n`,
+      `- Access: ${ACCESS}; a workspace connection with an admin-chosen tool list; ${RULES}\n`,
     )
   })
 
@@ -140,16 +144,17 @@ describe("buildStatus", () => {
     )
   })
 
-  test("counts the available tools, names the unknown ones, and counts denied ones apart; missing known tools are normal", () => {
+  test("counts the available tools, names the unknown ones, and counts the destructive class apart; missing known tools are normal", () => {
     const status = buildStatus({ ...base, tools: ["notion-search", "notion-create-comment", "notion-delete-pages", "shiny-new-tool", "notion-schedule-interview"] })
-    expect(status.tools).toBe(4)
-    expect(status.deniedTools).toEqual(["notion-delete-pages"])
+    expect(status.tools).toBe(5)
+    expect(status.destructiveTools).toEqual(["notion-delete-pages"])
+    expect(status.deniedTools).toEqual(status.destructiveTools)
     expect(status.unknownCount).toBe(2)
     expect(status.unknownTools).toEqual(["shiny-new-tool", "notion-schedule-interview"])
-    expect(formatStatus(status)).toContain("- Tools: 4 available, 2 unknown: shiny-new-tool, notion-schedule-interview (unknown tools ask before running); off by default: notion-delete-pages\n")
+    expect(formatStatus(status)).toContain("- Tools: 5 available, 2 unknown: shiny-new-tool, notion-schedule-interview (a tool Notion adds is allowed at once); notion-delete-pages allowed like everything else\n")
     expect(status.nextStep).toBe(NOTHING_TO_DO)
-    const denied = buildStatus({ ...base, tools: ["notion-search", "notion-delete-pages", "notion-restore-version"] })
-    expect(formatStatus(denied)).toContain("- Tools: 1 available, 0 unknown; off by default: notion-delete-pages and notion-restore-version\n")
+    const restrictive = buildStatus({ ...base, access: "read-only", tools: ["notion-search", "notion-delete-pages", "notion-restore-version"] })
+    expect(formatStatus(restrictive)).toContain("- Tools: 3 available, 0 unknown; notion-delete-pages and notion-restore-version denied\n")
   })
 
   test("a server that just connected and lists no tools yet is still listing them, with no advice to ask an admin", () => {
@@ -165,15 +170,16 @@ describe("buildStatus", () => {
     expect(buildStatus({ ...base, tools: [], settling: true, server: { status: "pending" } })).toMatchObject({ listing: false, state: "connecting" })
   })
 
-  test("the Access row says whether the default rules are in place, from what status can see", () => {
-    expect(formatStatus(buildStatus(base))).toContain(`- Access: ${ACCESS}\n`)
-    // The posture is the tool lists': 23 changes ask, 9 tools are off.
-    expect(ACCESS).toContain(`the ${WRITE_TOOLS.length} changes and any new tool ask first`)
-    expect(ACCESS).toContain(`the ${DENY_TOOLS.length} that delete, replace a whole page, upload a Skill, drive a Notion agent or cancel an event are off`)
-    const missing = buildStatus({ ...base, agents: [{ id: "reviewer", permissions: [allow("*")] }] })
-    expect(formatStatus(missing)).toContain(`- Access: ${POSTURE}; default rules missing in the agents listed below\n`)
-    const problem = "RULES_NOT_ADDED: Notion's default permission rules could not be added (boom), so Notion tools may run without asking. Next step: Restart OpenCode."
-    expect(formatStatus(buildStatus({ ...base, problems: [problem] }))).toContain(`- Access: ${POSTURE}; default rules not added (see the OpenCode row)\n`)
+  // R18: the Access row names the value, then the posture that value gives, then whether the block is in place.
+  test("the Access row names the access value and whether the default rules are in place", () => {
+    expect(formatStatus(buildStatus(base))).toContain(`- Access: ${ACCESS}; ${RULES}\n`)
+    expect(ACCESS).toBe("access all: every Notion tool is allowed, reads and changes alike")
+    const restrictive = { ...base, access: "read-only" as const }
+    expect(formatStatus(buildStatus(restrictive))).toContain(`- Access: access read-only: reads run without asking; the ${WRITE_TOOLS.length} writes and the ${DESTRUCTIVE_TOOLS.length} destructive tools are denied; ${RULES}\n`)
+    const missing = buildStatus({ ...restrictive, agents: [{ id: "reviewer", permissions: [allow("*")] }] })
+    expect(formatStatus(missing)).toContain(`- Access: access read-only: reads run without asking; the ${WRITE_TOOLS.length} writes and the ${DESTRUCTIVE_TOOLS.length} destructive tools are denied; default rules missing in the agents listed below\n`)
+    const problem = "RULES_NOT_ADDED: Notion's default permission rules could not be added (boom). Next step: Restart OpenCode."
+    expect(formatStatus(buildStatus({ ...base, problems: [problem] }))).toContain(`- Access: ${ACCESS}; default rules not added (see the OpenCode row)\n`)
   })
 
   test("a failure's reason never carries a token or key the host's text echoed", () => {
@@ -188,18 +194,19 @@ describe("buildStatus", () => {
     const status = buildStatus({ ...base, tools: ["notion-search", ...odd, ...many] })
     expect(status.unknownCount).toBe(29)
     expect(status.unknownTools).toEqual(many.slice(0, 20))
-    expect(formatStatus(status)).toContain(`- Tools: 30 available, 29 unknown: ${many.slice(0, 20).join(", ")} and 9 more (unknown tools ask before running)`)
-    expect(formatStatus(buildStatus({ ...base, tools: odd }))).toContain("- Tools: 4 available, 4 unknown (unknown tools ask before running)")
+    expect(formatStatus(status)).toContain(`- Tools: 30 available, 29 unknown: ${many.slice(0, 20).join(", ")} and 9 more (a tool Notion adds is allowed at once)`)
+    expect(formatStatus(buildStatus({ ...base, tools: odd }))).toContain("- Tools: 4 available, 4 unknown (a tool Notion adds is allowed at once)")
   })
 
   test("names agents without the default rules, with the block to paste, and points the next step at it", () => {
-    const status = buildStatus({ ...base, agents: [guarded, { id: "reviewer", permissions: [allow("*")] }] })
+    const readOnly = { ...base, access: "read-only" as const }
+    const status = buildStatus({ ...readOnly, agents: [guardedFor("read-only"), { id: "reviewer", permissions: [allow("*")] }] })
     expect(status.unguardedAgents).toEqual(["reviewer"])
     expect(status.nextStep).toBe(
       "Put the default rules shown by /notion-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Notion tools.",
     )
-    expect(JSON.parse(`[${AGENT_RULES}]`)).toEqual(defaultRules())
-    expect(formatStatus(status)).toContain(`- Agents without default rules: reviewer\n${AGENT_RULES}\n- OpenCode:`)
+    expect(JSON.parse(`[${agentRuleList("read-only")}]`)).toEqual(defaultRules("read-only"))
+    expect(formatStatus(status)).toContain(`- Agents without default rules: reviewer\n${agentRuleList("read-only")}\n- OpenCode:`)
   })
 
   test("an agent whose own rules already ask or deny for every Notion tool is not listed", () => {
@@ -208,11 +215,11 @@ describe("buildStatus", () => {
       { id: "denies-notion", permissions: [allow("*"), { action: "notion_*", resource: "*", effect: "deny" as const }] },
       { id: "reviewer", permissions: [allow("*")] },
     ]
-    expect(buildStatus({ ...base, agents }).unguardedAgents).toEqual(["reviewer"])
+    expect(buildStatus({ ...base, access: "read-only", agents }).unguardedAgents).toEqual(["reviewer"])
   })
 
   test("the sign-in step comes before the agent fix, which still shows, and there is one next step", () => {
-    const status = buildStatus({ ...base, server: { status: "needs_auth", error: "x" }, agents: [{ id: "reviewer", permissions: [allow("*")] }] })
+    const status = buildStatus({ ...base, access: "read-only", server: { status: "needs_auth", error: "x" }, agents: [{ id: "reviewer", permissions: [allow("*")] }] })
     expect(status.nextStep).toBe(SIGN_IN)
     const text = formatStatus(status)
     expect(text).toContain(`- Connection: sign-in required (${URL}, registered by this plugin)`)
@@ -234,15 +241,16 @@ describe("buildStatus", () => {
       'Rename or move the "notion" skill at /projects/acme/.opencode/skills/notion/SKILL.md, which OpenCode loads instead of the plugin\'s skill of the same name.',
     )
     expect(buildStatus({ ...base, skills: { own, listed: own } })).not.toHaveProperty("shadowedSkills")
-    expect(buildStatus({ ...base, skills: { own, listed }, agents: [{ id: "reviewer", permissions: [allow("*")] }] }).nextStep).toStartWith("Put the default rules")
+    // With a restricting access, an agent missing the block comes before the skill: the order says which matters first.
+    expect(buildStatus({ ...base, access: "read-only", skills: { own, listed }, agents: [{ id: "reviewer", permissions: [allow("*")] }] }).nextStep).toStartWith("Put the default rules")
   })
 
   // DR-11: a failed rules insert leaves the agents unguarded, but the fault is the insert; its own step comes first.
   test("a rules failure points at the OpenCode row, not at the agents it leaves unguarded", () => {
-    const problem = "RULES_NOT_ADDED: Notion's default permission rules could not be added (boom), so Notion tools may run without asking. Next step: Restart OpenCode."
+    const problem = "RULES_NOT_ADDED: Notion's default permission rules could not be added (boom). Next step: Restart OpenCode."
     const status = buildStatus({ ...base, problems: [problem], agents: [{ id: "reviewer", permissions: [allow("*")] }] })
     expect(status.nextStep).toBe("Restart OpenCode.")
-    expect(formatStatus(status)).toContain(`- Access: ${POSTURE}; default rules not added (see the OpenCode row)`)
+    expect(formatStatus(status)).toContain(`- Access: ${ACCESS}; default rules not added (see the OpenCode row)`)
   })
 
   test("an untested host and setup problems show on the OpenCode row; a problem's own next step comes first", () => {
@@ -265,7 +273,7 @@ describe("buildStatus", () => {
 function statusContext(server: string, skills: Promise<unknown> = Promise.resolve({ data: [] })) {
   const ctx = {
     mcp: { list: async () => ({ data: [{ name: "github", status: { status: "connected" } }, { name: "notion", status: { status: server }, integrationID: "mcp_fake" }] }) },
-    agent: { list: async () => ({ data: [guarded, { id: "reviewer", permissions: [allow("*")] }] }) },
+    agent: { list: async () => ({ data: [guardedFor("read-only"), { id: "reviewer", permissions: [allow("*")] }] }) },
     tool: {
       list: async () => [
         { id: "notion_notion-search", name: "notion-search", options: { namespace: "notion" } },
@@ -296,7 +304,7 @@ function accountState(account: { workspace?: string; connection?: "person" | "bo
 describe("readStatus", () => {
   test("reads connection, the workspace, tools and agents through public APIs", async () => {
     const account = accountState({ workspace: "Acme Robotics", connection: "person" })
-    const status = await readStatus(statusContext("connected"), { source: { type: "plugin", url: URL, signIn: "oauth" }, host, problems: [], account, listing: { changedAt: () => 0 } })
+    const status = await readStatus(statusContext("connected"), { source: { type: "plugin", url: URL, signIn: "oauth" }, host, problems: [], account, listing: { changedAt: () => 0 }, access: "read-only" })
     expect(status).toMatchObject({ state: "connected", workspace: "Acme Robotics", connection: "person", tools: 2, unknownTools: ["shiny-new-tool"], unguardedAgents: ["reviewer"], listing: false })
   })
 

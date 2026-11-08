@@ -4,12 +4,10 @@
 //   npm run drift                 # compare the committed fixture with src/notion-tools.ts
 //   npm run drift -- <tools.json> [--strict]   # compare a tools/list saved from a signed-in server
 //
-// The post-sign-in reconcile is: save the server's tools/list (or ctx.tool.list()) to test/unit/notion-live-tools.json,
-// run `npm run drift -- --strict`, and update src/notion-tools.ts, PARAMETERS, package.json's jelly.tools and the skills
-// until it reports no drift.
-//
-// A list may be an MCP client's tools/list result ({ "tools": [{ name, description, annotations, inputSchema }] }) or the
-// fixture's form ({ "tools": [{ name, class, annotations, inputs }] }), where annotations and inputs may be missing.
+// The post-sign-in reconcile is: save the server's tools/list to test/unit/notion-live-tools.json, run
+// `npm run drift -- --strict`, and update src/notion-tools.ts, PARAMETERS, package.json's jelly.tools and the skills
+// until it reports no drift. The fixture is that raw form: { "tools": [ { "name", "description", "inputSchema"?,
+// "annotations"? } ] }.
 // Names are accepted with the server prefix (`notion_notion-search`), the MCP name (`notion-search`) or a dotted path.
 // Exit codes: 0 no drift, or drift without --strict; 1 drift with --strict; 2 usage or file error.
 // Needs Node 22.18 or later, which loads the TypeScript file by stripping its types.
@@ -28,6 +26,7 @@ for (const arg of process.argv.slice(2)) {
 }
 if (!process.features.typescript) fail(`Node ${process.versions.node} cannot load TypeScript files. Use Node 22.18 or later.`)
 
+/** The effect `access: "read-only"` gives a class: a read allows, everything else denies. */
 const effectOf = (kind) => (kind === "read" ? "allow" : kind === "write" ? "ask" : "deny")
 
 const known = await loadKnown()
@@ -52,7 +51,7 @@ const parameters = [...live]
   .sort()
 
 const count = (kind) => [...live.keys()].filter((name) => known.classOf.get(name) === kind).length
-console.log(`The list holds ${live.size} tools: ${count("read")} read, ${count("write")} write, ${count("denied")} denied, ${added.length} with no rule.`)
+console.log(`The list holds ${live.size} tools: ${count("read")} read, ${count("write")} write, ${count("destructive")} destructive, ${added.length} with no rule.`)
 section("Added: in the list, in no list of src/notion-tools.ts", added, true)
 section("Removed: in src/notion-tools.ts, not in this list (a plan or an Enterprise tool list may omit tools)", removed, false)
 section("Reclassified: the rule disagrees with the list's annotations", reclassified, true)
@@ -148,7 +147,7 @@ async function loadKnown() {
     fail(`cannot load src/notion-tools.ts (${error?.code ?? error?.message ?? error}). Keep it free of runtime imports so Node can strip its types.`)
   }
   const classOf = new Map()
-  for (const [list, kind] of [["READ_TOOLS", "read"], ["WRITE_TOOLS", "write"], ["DENY_TOOLS", "denied"]]) {
+  for (const [list, kind] of [["READ_TOOLS", "read"], ["WRITE_TOOLS", "write"], ["DESTRUCTIVE_TOOLS", "destructive"]]) {
     if (!Array.isArray(module[list])) fail(`src/notion-tools.ts must export ${list} as an array of tool names.`)
     for (const name of module[list]) classOf.set(name, kind)
   }

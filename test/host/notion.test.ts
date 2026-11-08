@@ -1,6 +1,6 @@
 // The plugin on the public @opencode/sdk host: H1 load and connect, H2 what runs and what asks, H3 the permission
 // model (P1-P5), H4 adoption and conflict, H5 /notion-status, H6 unload, the user's own server with a header secret that
-// never reaches status or a script, the nine denied tools on every path (direct, model turns with Code Mode off and on,
+// never reaches status or a script, the nine destructive tools on every path (direct, model turns with Code Mode off and on,
 // scripts) and their opt-in, the account capture, a server that asks for a sign-in, the CIMD sign-in OpenCode starts,
 // and the /connect entry. Each describe owns one host.
 import { ROOT } from "./isolate.js"
@@ -10,7 +10,7 @@ import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
 import { Plugin } from "@opencode/plugin"
 import { SUPPORTED_HOST, TESTED_HOSTS } from "../../src/constants.js"
-import { DENY_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
+import { DESTRUCTIVE_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
 import { defaultRules, type Rule } from "../../src/permissions.js"
 import { SKILL_NAMES } from "../../src/skills.js"
 import { StatusRpc } from "../../src/status.js"
@@ -18,15 +18,14 @@ import { TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
 import { ACCOUNT_READ, CHALLENGE_SCOPE, CLIENT_URL, MODEL_ID, SAMPLE_READ, SAMPLE_WRITE } from "./fake-mcp.js"
 import { agentRules, attempt, cleanup, effect, HOST_VERSION, session, startHost, until, type Host } from "./harness.js"
 
-const AGENT_RULES = defaultRules().map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`).join("\n")
-const AGENTS_NEXT_STEP = "Put the default rules shown by /notion-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Notion tools."
 const TOKEN = "ntn_fake_host_test_0123456789"
 const SIGN_IN = "Run /connect and choose Notion, then press o or Enter to open the link (in a terminal, opencode mcp auth notion opens it automatically: run it from the project folder where the plugin is installed, and if it answers MCP server not found: notion, wait a few seconds and run it again)."
 const SIGN_IN_AGAIN = "Notion needs a new sign-in. Choose this account to sign in again."
-/** The default list: two reads, every write, every denied tool, and the unknown one. */
-const LISTED = 2 + WRITE_TOOLS.length + DENY_TOOLS.length + 1
-const AVAILABLE = 2 + WRITE_TOOLS.length + 1
-const OFF = `${DENY_TOOLS.slice(0, -1).join(", ")} and ${DENY_TOOLS.at(-1)}`
+/** The default list: two reads, every write, every destructive tool, and the unknown one. */
+const LISTED = 2 + WRITE_TOOLS.length + DESTRUCTIVE_TOOLS.length + 1
+/** Every tool OpenCode lists, the unknown one included: status counts them all. */
+const AVAILABLE = LISTED
+const OFF = `${DESTRUCTIVE_TOOLS.slice(0, -1).join(", ")} and ${DESTRUCTIVE_TOOLS.at(-1)}`
 
 // Starting a host takes several seconds, more on a busy machine; the longest wait below polls a condition with 180 s.
 setDefaultTimeout(300_000)
@@ -43,7 +42,7 @@ const hidden = (rules: readonly Rule[], action: string) => {
 }
 
 /**
- * The host lists an MCP server's tools shortly after it connects. The registry lists the denied tools too; the deny
+ * The host lists an MCP server's tools shortly after it connects. The registry lists the destructive class too; a deny
  * hides them from the model's tools and refuses them.
  */
 const notionTools = (host: Host) =>
@@ -64,7 +63,7 @@ async function status(host: Host, sessionID: string) {
 /** Enough of the tools RPC's contract for the client to call describe and the methods these tests use. */
 const TOOLS_CONTRACT = {
   id: TOOLS_RPC_ID,
-  methods: Object.fromEntries(["describe", ACCOUNT_READ, SAMPLE_READ, "notion-fetch", "notion-update-page", ...DENY_TOOLS].map((name) => [name, { input: { type: "object" }, output: { type: "object" } }])),
+  methods: Object.fromEntries(["describe", ACCOUNT_READ, SAMPLE_READ, "notion-fetch", "notion-update-page", ...DESTRUCTIVE_TOOLS].map((name) => [name, { input: { type: "object" }, output: { type: "object" } }])),
   events: {},
 }
 type ToolsClient = Record<string, (input: object, options: object) => Promise<unknown>>
@@ -102,7 +101,7 @@ describe(`the plugin on OpenCode ${HOST_VERSION}`, () => {
     expect(plugins.find((plugin) => plugin.id === "notion.workspace")?.state.status).toBe("active")
     const { data: servers } = await host.client.mcp.list({ location: host.location })
     expect(servers.find((server) => server.name === "notion")?.status).toEqual({ status: "connected" })
-    expect(await notionTools(host)).toEqual([...["shiny_new_tool", SAMPLE_READ, ACCOUNT_READ, ...WRITE_TOOLS, ...DENY_TOOLS].map((tool) => `notion_${tool}`)].sort())
+    expect(await notionTools(host)).toEqual([...["shiny_new_tool", SAMPLE_READ, ACCOUNT_READ, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS].map((tool) => `notion_${tool}`)].sort())
     const { data: skills } = await host.client.skill.list({ location: host.location })
     expect(skills.map((skill) => skill.id).filter((id) => id.startsWith("notion")).sort()).toEqual([...SKILL_NAMES].sort())
     const { data: commands } = await host.client.command.list({ location: host.location })
@@ -127,50 +126,83 @@ describe(`the plugin on OpenCode ${HOST_VERSION}`, () => {
     expect(await effect(host, "explore", "notion_notion-search")).toBe("deny")
     const explore = await session(host, "explore")
     expect(await attempt(host, explore, "explore", SAMPLE_READ)).toEqual({ asked: undefined, ok: false, error: `Tool.Error: Permission denied: notion_${SAMPLE_READ}` })
+    // Plan is not weakened: its own deny is on `edit`, so a new Notion tool runs under the default allow.
     const plan = await session(host, "plan")
-    expect(await attempt(host, plan, "plan", "shiny_new_tool")).toMatchObject({ asked: "notion_shiny_new_tool", ok: false })
+    expect(await attempt(host, plan, "plan", "shiny_new_tool")).toMatchObject({ asked: undefined, ok: true })
   })
 
-  test("P2 and H2: known reads run without a prompt, everything else asks, and the denied tools are hidden", async () => {
+  // R18: the default is `access: "all"`, so every tool runs without a prompt, nothing is hidden, and a tool Notion adds
+  // later is allowed at once by the namespace pattern.
+  test("P2 and H2: under access all every known tool runs without a prompt, nothing is hidden, and a new tool is allowed", async () => {
     const build = await session(host)
     const before = host.fake.calls.length
     expect(await attempt(host, build, "build", SAMPLE_READ)).toMatchObject({ asked: undefined, ok: true })
-    expect(await attempt(host, build, "build", "shiny_new_tool")).toEqual({ asked: "notion_shiny_new_tool", ok: false, error: "Permission.DeclinedError: " })
-    // Every known write asks, and a declined ask never reaches Notion.
-    for (const tool of WRITE_TOOLS) {
-      expect({ tool, result: await attempt(host, build, "build", tool) }).toEqual({ tool, result: { asked: `notion_${tool}`, ok: false, error: "Permission.DeclinedError: " } })
+    for (const tool of [...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS, "shiny_new_tool"]) {
+      expect({ tool, result: await attempt(host, build, "build", tool) }).toMatchObject({ tool, result: { asked: undefined, ok: true } })
     }
-    expect(host.fake.calls.slice(before)).toEqual([SAMPLE_READ])
+    expect(host.fake.calls.slice(before)).toEqual([SAMPLE_READ, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS, "shiny_new_tool"])
     const rules = (await agentRules(host)).get("build")!
-    expect([`notion_${SAMPLE_READ}`, `notion_${SAMPLE_WRITE}`, "notion_shiny_new_tool"].filter((action) => hidden(rules, action))).toEqual([])
-    // Each denied tool is hidden, refused with no prompt even when "always" would be the answer, and never reaches
-    // Notion, in every built-in agent.
-    const all = await agentRules(host)
-    for (const tool of DENY_TOOLS) {
-      for (const id of BUILT_IN) expect({ id, tool, hidden: hidden(all.get(id)!, `notion_${tool}`) }).toEqual({ id, tool, hidden: true })
-      expect(await effect(host, "build", `notion_${tool}`)).toBe("deny")
-      expect(await attempt(host, build, "build", tool, "always")).toEqual({ asked: undefined, ok: false, error: `Tool.Error: Permission denied: notion_${tool}` })
-      expect(host.fake.calls).not.toContain(tool)
+    expect([`notion_${SAMPLE_READ}`, `notion_${SAMPLE_WRITE}`, "notion_notion-delete-pages", "notion_shiny_new_tool"].filter((action) => hidden(rules, action))).toEqual([])
+    for (const tool of [...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS, "shiny_new_tool"]) expect(await effect(host, "build", `notion_${tool}`)).toBe("allow")
+  })
+
+  test("access ask-changes runs a read and refuses a change before dispatch, on the model path and the RPC path", async () => {
+    const asking = await startHost({ options: { access: "ask-changes" } })
+    try {
+      const build = await session(asking)
+      expect(await attempt(asking, build, "build", SAMPLE_READ)).toMatchObject({ asked: undefined, ok: true })
+      const before = asking.fake.calls.length
+      for (const tool of [...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS, "shiny_new_tool"]) {
+        expect({ tool, result: await attempt(asking, build, "build", tool) }).toEqual({ tool, result: { asked: `notion_${tool}`, ok: false, error: "Permission.DeclinedError: " } })
+      }
+      expect(asking.fake.calls.length).toBe(before)
+      // A script gets the same answer: an ask is refused with no call, and the error names the rule to add.
+      const refused = JSON.parse(await scriptCall(asking, "notion-update-page", { sessionID: build, input: { query: "Acme" } })) as { message: string }
+      expect(refused.message).toContain("PERMISSION_DENIED: notion_notion-update-page would ask")
+      expect(asking.fake.calls.length).toBe(before)
+    } finally {
+      await asking.close()
     }
   })
 
-  test("a script's read runs, and a write runs only in a session that names an allow for it", async () => {
+  test("access read-only runs a read and denies every change, hidden from the model and refused to a script", async () => {
+    const readOnly = await startHost({ options: { access: "read-only" } })
+    try {
+      const build = await session(readOnly)
+      expect(await attempt(readOnly, build, "build", SAMPLE_READ)).toMatchObject({ asked: undefined, ok: true })
+      const rules = (await agentRules(readOnly)).get("build")!
+      for (const tool of [...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS, "shiny_new_tool"]) {
+        expect({ tool, hidden: hidden(rules, `notion_${tool}`) }).toEqual({ tool, hidden: true })
+        expect({ tool, effect: await effect(readOnly, "build", `notion_${tool}`) }).toEqual({ tool, effect: "deny" })
+      }
+      const before = readOnly.fake.calls.length
+      for (const tool of [...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS]) {
+        expect(await attempt(readOnly, build, "build", tool, "always")).toEqual({ asked: undefined, ok: false, error: `Tool.Error: Permission denied: notion_${tool}` })
+      }
+      expect(readOnly.fake.calls.length).toBe(before)
+      // Status reports the value it runs under, and the destructive class as denied.
+      const text = await status(readOnly, build)
+      expect(text).toContain(`- Access: access read-only: reads run without asking; the ${WRITE_TOOLS.length} writes and the ${DESTRUCTIVE_TOOLS.length} destructive tools are denied`)
+      expect(text).toContain(`- Tools: ${AVAILABLE} available, 1 unknown: shiny_new_tool (a tool Notion adds is denied); ${OFF} denied`)
+    } finally {
+      await readOnly.close()
+    }
+  })
+
+  test("a script can call a read and a write under the default, and a session's own deny still refuses one", async () => {
     const reader = await session(host)
     const before = host.fake.calls.length
     const read = JSON.parse(await scriptCall(host, SAMPLE_READ, { sessionID: reader, input: { query: "Acme" } })) as { text: string }
     expect(read.text).toBe(`called ${SAMPLE_READ}`)
     expect(host.fake.calls.slice(before)).toEqual([SAMPLE_READ])
-    const writer = await grantedSession(host, [{ action: "*", resource: "*", effect: "deny" }, { action: "notion_notion-update-page", resource: "*", effect: "allow" }])
-    const write = JSON.parse(await scriptCall(host, "notion-update-page", { sessionID: writer, input: { query: "Acme" } })) as { text: string }
+    // The default block allows every method, so a write needs no further rule.
+    const write = JSON.parse(await scriptCall(host, "notion-update-page", { sessionID: reader, input: { query: "Acme" } })) as { text: string }
     expect(write.text).toBe("called notion-update-page")
     expect(host.fake.calls.at(-1)).toBe("notion-update-page")
-  })
-
-  test("a write that would ask is refused before dispatch, with no Notion call", async () => {
-    const before = host.fake.calls.length
-    const refused = JSON.parse(await scriptCall(host, "notion-update-page", { sessionID: await session(host), input: { query: "Acme" } })) as { message: string }
-    expect(refused.message).toContain("PERMISSION_DENIED: notion_notion-update-page would ask")
-    expect(host.fake.calls.length).toBe(before)
+    // A session's own rules come last and still win.
+    const narrowed = await grantedSession(host, [{ action: "notion_notion-update-page", resource: "*", effect: "deny" }])
+    const refused = JSON.parse(await scriptCall(host, "notion-update-page", { sessionID: narrowed, input: { query: "Acme" } })) as { message: string }
+    expect(refused.message).toContain("PERMISSION_DENIED")
   })
 
   test("describe with a session reports each method's class and permission, and without one no permission", async () => {
@@ -181,8 +213,8 @@ describe(`the plugin on OpenCode ${HOST_VERSION}`, () => {
     }
     const find = (name: string) => described.methods.find((method) => method.name === name)!
     expect(find(SAMPLE_READ)).toMatchObject({ class: "read", permission: "allow" })
-    expect(find("notion-update-page")).toMatchObject({ class: "write", permission: "ask" })
-    expect(find("notion-delete-pages")).toMatchObject({ class: "destructive", permission: "deny" })
+    expect(find("notion-update-page")).toMatchObject({ class: "write", permission: "allow" })
+    expect(find("notion-delete-pages")).toMatchObject({ class: "destructive", permission: "allow" })
     expect(described.location).toBe(host.location.directory)
     expect(described.locationHint).toContain("x-opencode-directory")
     const plain = JSON.parse(await scriptCall(host, "describe", {})) as { methods: { permission?: string }[] }
@@ -200,57 +232,54 @@ describe(`the plugin on OpenCode ${HOST_VERSION}`, () => {
     expect(fallback.location).not.toBe(host.location.directory)
   })
 
-  test("no script reaches a denied tool: each is a method, describe shows it denied, and a call is refused before dispatch", async () => {
+  test("the destructive class is a method, describe shows it allowed by default, and a session's own deny refuses it", async () => {
     const sessionID = await session(host)
     const described = JSON.parse(await scriptCall(host, "describe", { sessionID })) as { methods: { name: string; class: string; permission: string }[] }
-    for (const tool of DENY_TOOLS) {
-      expect(described.methods.find((method) => method.name === tool)).toMatchObject({ class: "destructive", permission: "deny" })
+    const denied = await grantedSession(host, DESTRUCTIVE_TOOLS.map((tool) => ({ action: `notion_${tool}`, resource: "*", effect: "deny" as const })))
+    const narrowed = JSON.parse(await scriptCall(host, "describe", { sessionID: denied })) as { methods: { name: string; class: string; permission: string }[] }
+    const start = host.fake.calls.length
+    for (const tool of DESTRUCTIVE_TOOLS) {
+      expect(described.methods.find((method) => method.name === tool)).toMatchObject({ class: "destructive", permission: "allow" })
+      expect(narrowed.methods.find((method) => method.name === tool)).toMatchObject({ class: "destructive", permission: "deny" })
       const before = host.fake.calls.length
       const call = (host.client.rpc as unknown as { call: (input: object) => Promise<unknown> }).call
-      const outcome = await call({ rpcID: TOOLS_RPC_ID, method: tool, input: { sessionID, input: { query: "trash it" } }, location: host.location }).then(
+      const outcome = await call({ rpcID: TOOLS_RPC_ID, method: tool, input: { sessionID: denied, input: { query: "trash it" } }, location: host.location }).then(
         (output) => ({ ran: true, output }),
         (error: unknown) => ({ ran: false, error: JSON.stringify(error, Object.getOwnPropertyNames(error ?? {})) }),
       )
       expect(outcome).toMatchObject({ ran: false })
       expect(JSON.stringify(outcome)).toContain("PERMISSION_DENIED")
       expect(host.fake.calls.length).toBe(before)
-      expect(host.fake.calls).not.toContain(tool)
+      expect(host.fake.calls.slice(start)).not.toContain(tool)
     }
   })
 
-  test("P4: a saved 'Always allow' removes the prompt", async () => {
-    const build = await session(host)
-    expect(await attempt(host, build, "build", "shiny_new_tool", "always")).toMatchObject({ asked: "notion_shiny_new_tool", ok: true })
-    expect(await attempt(host, build, "build", "shiny_new_tool")).toMatchObject({ asked: undefined, ok: true })
-    const { projectID } = await host.client.sessions.get({ sessionID: build })
-    const saved = await host.client.permission.saved.list({ projectID })
-    expect(saved.map(({ action, resource }) => ({ action, resource }))).toEqual([{ action: "notion_shiny_new_tool", resource: "*" }])
-  })
-
-  test("P5: an agent defined only in user config gets no rules, and Notion tools run there unprompted", async () => {
+  test("P5: an agent defined only in user config gets no rules, and a change runs there under the default", async () => {
     const reviewer = (await agentRules(host)).get("reviewer")!
     expect(reviewer.some((rule) => rule.action.startsWith("notion_"))).toBe(false)
     const sessionID = await session(host, "reviewer")
     expect(await attempt(host, sessionID, "reviewer", SAMPLE_WRITE)).toMatchObject({ asked: undefined, ok: true })
   })
 
-  test("H5: /notion-status reports the connection, the tools, the denied ones, the unguarded agent and its fix", async () => {
+  test("H5: /notion-status reports the connection, the access, the tools and the agent without the block", async () => {
     await notionTools(host)
     const before = host.fake.calls.length
     const text = await status(host, await session(host))
     expect(text).toContain(`- Connection: connected (${host.fake.url}, registered by this plugin)`)
     // No account read yet, so no workspace name.
     expect(text).toContain("- Account: not read yet: it appears after a notion-get-self call\n")
-    expect(text).toContain(`- Access: reads run without asking; the ${WRITE_TOOLS.length} changes and any new tool ask first; the ${DENY_TOOLS.length} that delete, replace a whole page, upload a Skill, drive a Notion agent or cancel an event are off; default rules missing in the agents listed below\n`)
+    // A host with a config-only agent still names it under the restricting values; this host runs the default `all`.
+    expect(text).toContain("- Access: access all: every Notion tool is allowed, reads and changes alike; every agent has the block\n")
     // Notion's own sign-in metadata calls the server beta; status says so wherever it runs.
     expect(text).toContain("- Server: Notion MCP (Beta): Notion may change its tools and behaviour\n")
-    expect(text).toContain(`- Tools: ${AVAILABLE} available, 1 unknown: shiny_new_tool (unknown tools ask before running); off by default: ${OFF}\n`)
-    expect(text).toContain(`- Agents without default rules: reviewer\n${AGENT_RULES}\n`)
-    expect(text).toContain(`- Next step: ${AGENTS_NEXT_STEP}`)
+    // Every tool OpenCode lists counts now, the destructive ones and the unknown one included.
+    expect(text).toContain(`- Tools: ${AVAILABLE} available, 1 unknown: shiny_new_tool (a tool Notion adds is allowed at once); ${OFF} allowed like everything else\n`)
+    expect(text).toContain("- Agents without default rules: none\n")
+    expect(text).toContain("- Next step: Nothing to do.")
     expect(text).toContain(`- OpenCode: ${HOST_VERSION} (${TESTED_HOSTS.includes(HOST_VERSION) ? "tested" : "untested"}; supported range ${SUPPORTED_HOST})`)
     expect(text).not.toContain("Plan")
     const output = await statusRpc(host)
-    expect(output).toMatchObject({ state: "connected", workspace: null, connection: null, beta: true, tools: AVAILABLE, deniedTools: [...DENY_TOOLS], unknownCount: 1, listing: false, unguardedAgents: ["reviewer"] })
+    expect(output).toMatchObject({ state: "connected", access: "all", workspace: null, connection: null, beta: true, tools: AVAILABLE, deniedTools: [...DESTRUCTIVE_TOOLS], unknownCount: 1, listing: false, unguardedAgents: [] })
     // DR-9: status is built from the host's own lists; neither the command nor the RPC calls Notion. The dialog shows the
     // same RPC answer through the terminal UI, so it adds no call either.
     expect(host.fake.calls.slice(before)).toEqual([])
@@ -299,7 +328,7 @@ describe("the user's own notion server, with a secret in its headers", () => {
 
   test("H4: is adopted unchanged: the host sends its headers, and the plugin's rules still apply", async () => {
     expect(await attempt(host, await session(host), "build", SAMPLE_READ)).toMatchObject({ asked: undefined, ok: true })
-    expect(await attempt(host, await session(host), "build", SAMPLE_WRITE)).toMatchObject({ asked: `notion_${SAMPLE_WRITE}`, ok: false })
+    expect(await attempt(host, await session(host), "build", SAMPLE_WRITE)).toMatchObject({ asked: undefined, ok: true })
     expect(host.fake.markers.length).toBeGreaterThan(0)
     expect(new Set(host.fake.markers)).toEqual(new Set(["user"]))
     expect(new Set(host.fake.authorizations)).toEqual(new Set([`Bearer ${TOKEN}`]))
@@ -337,8 +366,9 @@ const scripted = (host: Host) => host.client.sessions as unknown as {
 }
 
 /** A host whose own `notion` entry points at the fake, whose model is the fake's scripted model, with Code Mode on or off. */
-async function modelHost(codemode: boolean) {
+async function modelHost(codemode: boolean, options: { access?: "all" | "ask-changes" | "read-only" } = {}) {
   const host = await startHost({
+    options,
     config: (url) => ({
       mcp: { servers: { notion: { type: "remote", url, oauth: false, ...(codemode ? {} : { codemode: false }) } } },
       // No model leaves the machine: LM Studio's local API is the fake; the other local providers are off.
@@ -351,40 +381,44 @@ async function modelHost(codemode: boolean) {
   return host
 }
 
-describe("a model turn that asks for the denied tools, with Code Mode off", () => {
+// R2 on the model path, with Code Mode off: under access read-only the model's own call to a change never reaches
+// Notion, and the tool is not offered to it.
+describe("a model turn that asks for the changes access read-only denies, with Code Mode off", () => {
   let host: Host
   beforeAll(async () => {
-    host = await modelHost(false)
+    host = await modelHost(false, { access: "read-only" })
   })
   afterAll(() => host?.close())
 
-  test("the model's own calls to the denied tools never reach Notion, and none is offered to it", async () => {
-    host.fake.model.script = DENY_TOOLS.map((tool) => ({ tool: `notion_${tool}`, arguments: { query: "trash it" } }))
+  test("the model's own calls to a denied change never reach Notion, and none is offered to it", async () => {
+    host.fake.model.script = DESTRUCTIVE_TOOLS.map((tool) => ({ tool: `notion_${tool}`, arguments: { query: "trash it" } }))
     const before = host.fake.model.requests.length
     const sessionID = (await scripted(host).create({ agent: "build", location: host.location, model: { providerID: "lmstudio", id: MODEL_ID } })).id
     await scripted(host).prompt({ sessionID, text: "Delete the launch page and stop the agent." })
     const turns = () => host.fake.model.requests.slice(before) as { tools?: { function?: { name?: string } }[]; messages?: { role: string }[] }[]
-    await until("the model's final turn", async () => turns().some((request) => (request.messages ?? []).filter((message) => message.role === "tool").length >= DENY_TOOLS.length))
+    await until("the model's final turn", async () => turns().some((request) => (request.messages ?? []).filter((message) => message.role === "tool").length >= DESTRUCTIVE_TOOLS.length))
     const offered = turns().flatMap((request) => (request.tools ?? []).map((item) => item.function?.name ?? ""))
     expect(offered.filter((name) => name.startsWith("notion_"))).toContain(`notion_${SAMPLE_READ}`)
-    for (const tool of DENY_TOOLS) {
+    for (const tool of DESTRUCTIVE_TOOLS) {
       expect(offered).not.toContain(`notion_${tool}`)
       expect(host.fake.calls).not.toContain(tool)
     }
   })
 })
 
-describe("a Code Mode turn that asks for the denied tools", () => {
+// R2 on the Code Mode path: inside `execute`, under access read-only, a read runs, and a change or an unknown name is
+// denied inside the program and never reaches Notion.
+describe("a Code Mode turn that asks for the changes access read-only denies", () => {
   let host: Host
   beforeAll(async () => {
-    host = await modelHost(true)
+    host = await modelHost(true, { access: "read-only" })
   })
   afterAll(() => host?.close())
 
-  test("an inner tools.notion call to a denied tool fails inside the program and never reaches Notion; a read runs", async () => {
+  test("an inner tools.notion call to a denied change or an unknown name fails inside the program and never reaches Notion; a read runs", async () => {
     const code = [
       "const results = []",
-      `for (const name of ${JSON.stringify(DENY_TOOLS)}) {`,
+      `for (const name of ${JSON.stringify([...DESTRUCTIVE_TOOLS, ...WRITE_TOOLS, "shiny_new_tool"])}) {`,
       "  try { await tools.notion[name]({ query: 'trash it' }); results.push(name + ': ran') } catch (error) { results.push(name + ': refused') }",
       "}",
       `results.push(String((await tools.notion[${JSON.stringify(SAMPLE_READ)}]({})) !== undefined))`,
@@ -396,11 +430,22 @@ describe("a Code Mode turn that asks for the denied tools", () => {
     await scripted(host).prompt({ sessionID, text: "Delete the launch page and stop the agent." })
     await until("the model's final turn", async () => host.fake.model.requests.slice(before).some((request) => (request as { messages?: { role: string }[] }).messages?.some((message) => message.role === "tool")))
     expect(host.fake.calls).toContain(SAMPLE_READ)
-    for (const tool of DENY_TOOLS) expect(host.fake.calls).not.toContain(tool)
+    for (const tool of [...DESTRUCTIVE_TOOLS, ...WRITE_TOOLS]) expect(host.fake.calls).not.toContain(tool)
   })
+})
 
-  // AF-5: a write inside a program asks, and a refusal stops it before Notion is called.
-  test("a write inside the program asks, and a declined prompt stops it", async () => {
+
+// R2 on the Code Mode path: under access ask-changes, a program's own call to a change asks, as it does on the direct
+// path. The program reports its own start with a read, so the test can tell "the write was refused" from "the program
+// never ran".
+describe("a Code Mode turn where access ask-changes asks for a change", () => {
+  let host: Host
+  beforeAll(async () => {
+    host = await modelHost(true, { access: "ask-changes" })
+  })
+  afterAll(() => host?.close())
+
+  test("a write inside the program asks, and a declined prompt stops it before Notion is called", async () => {
     const code = [
       "const results = []",
       `results.push(String((await tools.notion[${JSON.stringify(SAMPLE_READ)}]({})) !== undefined))`,
@@ -421,13 +466,53 @@ describe("a Code Mode turn that asks for the denied tools", () => {
   })
 })
 
-describe("the documented opt-in for a denied tool", () => {
-  // DP-1's recipe: the ask goes in the agent's own permissions, which come after the plugin's block in that agent.
+// R18: with `access: "ask-changes"` a change asks; a saved "Always allow" removes the prompt for that tool only, and an
+// agent's own allow or deny still wins over the block.
+describe("access ask-changes in an agent", () => {
+  let host: Host
+  beforeAll(async () => {
+    host = await startHost({ options: { access: "ask-changes" } })
+  })
+  afterAll(() => host?.close())
+
+  test("P4: a saved 'Always allow' removes the prompt for that one tool", async () => {
+    const build = await session(host)
+    expect(await attempt(host, build, "build", "shiny_new_tool", "always")).toMatchObject({ asked: "notion_shiny_new_tool", ok: true })
+    expect(await attempt(host, build, "build", "shiny_new_tool")).toMatchObject({ asked: undefined, ok: true })
+    // Another change still asks: the approval covers one action.
+    expect(await attempt(host, build, "build", SAMPLE_WRITE)).toMatchObject({ asked: `notion_${SAMPLE_WRITE}`, ok: false })
+    const { projectID } = await host.client.sessions.get({ sessionID: build })
+    const saved = await host.client.permission.saved.list({ projectID })
+    expect(saved.map(({ action, resource }) => ({ action, resource }))).toEqual([{ action: "notion_shiny_new_tool", resource: "*" }])
+  })
+
+  test("an agent's own allow or deny still wins over the plugin's block", async () => {
+    const own = await startHost({
+      options: { access: "ask-changes" },
+      config: () => ({ agents: { build: { permissions: [allow(SAMPLE_WRITE), deny("notion-create-pages")] } } }),
+    })
+    try {
+      await notionTools(own)
+      expect(await effect(own, "build", `notion_${SAMPLE_WRITE}`)).toBe("allow")
+      expect(await effect(own, "build", "notion_notion-create-pages")).toBe("deny")
+      const build = await session(own)
+      expect(await attempt(own, build, "build", SAMPLE_WRITE)).toMatchObject({ asked: undefined, ok: true })
+      expect(await attempt(own, build, "build", "notion-create-pages")).toEqual({ asked: undefined, ok: false, error: "Tool.Error: Permission denied: notion_notion-create-pages" })
+      expect(await attempt(own, build, "build", "notion-delete-pages")).toMatchObject({ asked: "notion_notion-delete-pages", ok: false })
+    } finally {
+      await own.close()
+    }
+  })
+})
+
+describe("the documented opt-in for a destructive tool under read-only", () => {
+  // The recipe the configuration guide gives: the ask goes in the agent's own permissions, which come after the
+  // plugin's block in that agent, so it turns one tool back on without reopening the rest.
   const tool = "notion-delete-pages"
   const optIn: Rule = { action: `notion_${tool}`, resource: "*", effect: "ask" }
   let host: Host
   beforeAll(async () => {
-    host = await startHost({ config: () => ({ agents: { build: { permissions: [optIn] } } }) })
+    host = await startHost({ options: { access: "read-only" }, config: () => ({ agents: { build: { permissions: [optIn] } } }) })
   })
   afterAll(() => host?.close())
 
@@ -442,9 +527,9 @@ describe("the documented opt-in for a denied tool", () => {
     // Each call asks again: a "once" answer runs one call and saves nothing.
     expect(await attempt(host, build, "build", tool, "once")).toMatchObject({ asked: `notion_${tool}`, ok: true })
     expect(await attempt(host, build, "build", tool)).toMatchObject({ asked: `notion_${tool}`, ok: false })
-    // The other agents, Explore included, and the other denied tools stay denied.
+    // The other agents, Explore included, and the other destructive tools stay denied.
     for (const id of BUILT_IN.filter((id) => id !== "build")) expect({ id, effect: await effect(host, id, `notion_${tool}`) }).toEqual({ id, effect: "deny" })
-    for (const other of DENY_TOOLS.filter((name) => name !== tool)) expect(await effect(host, "build", `notion_${other}`)).toBe("deny")
+    for (const other of DESTRUCTIVE_TOOLS.filter((name) => name !== tool)) expect(await effect(host, "build", `notion_${other}`)).toBe("deny")
   })
 })
 
@@ -467,12 +552,13 @@ describe("user permissions", () => {
     expect(await attempt(host, build, "build", SAMPLE_WRITE)).toMatchObject({ asked: undefined, ok: true })
     expect(await attempt(host, build, "build", SAMPLE_READ)).toEqual({ asked: undefined, ok: false, error: `Tool.Error: Permission denied: notion_${SAMPLE_READ}` })
     expect(hidden((await agentRules(host)).get("build")!, `notion_${SAMPLE_READ}`)).toBe(true)
-    expect(await attempt(host, build, "build", "shiny_new_tool")).toMatchObject({ asked: "notion_shiny_new_tool", ok: false })
+    // The user's rules win both ways; a tool the user says nothing about runs under the default `all`.
+    expect(await attempt(host, build, "build", "shiny_new_tool")).toMatchObject({ asked: undefined, ok: true })
   })
 
-  test("P5: the per-agent fix guards a config-only agent and keeps the user's rules winning", async () => {
+  test("P5: the per-agent fix puts the block in a config-only agent and keeps the user's rules winning", async () => {
     const reviewer = await session(host, "reviewer")
-    expect(await attempt(host, reviewer, "reviewer", "shiny_new_tool")).toMatchObject({ asked: "notion_shiny_new_tool", ok: false })
+    expect(await attempt(host, reviewer, "reviewer", "shiny_new_tool")).toMatchObject({ asked: undefined, ok: true })
     expect(await attempt(host, reviewer, "reviewer", SAMPLE_WRITE)).toMatchObject({ asked: undefined, ok: true })
     expect(await attempt(host, reviewer, "reviewer", SAMPLE_READ)).toMatchObject({ asked: undefined, ok: false })
     expect(await status(host, reviewer)).toContain("- Agents without default rules: none\n")

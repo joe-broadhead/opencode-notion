@@ -21,7 +21,7 @@ read it rather than guess. Keep calls to a few at a time: every call counts agai
 - A page can come back `truncated` with `unknown_block_ids`: fetch that subtree rather than guessing at what is missing.
 - `notion-list-page-backlinks` answers "where is this mentioned".
 - "What changed here" is `notion-get-version-changes`; `notion-view-version` reads the page as it was. Putting an old
-  version back is `notion-restore-version`, which is off.
+  version back is `notion-restore-version`, which is in the destructive class.
 - A miss on a full name: no shortened, partial or variant spellings. Say what you searched, then ask.
 
 ## Documents and databases

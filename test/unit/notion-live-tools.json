@@ -1,27 +1,13 @@
 {
-  "source": [
-    "https://developers.notion.com/guides/mcp/tools-faqs.md",
-    "https://developers.notion.com/guides/mcp/tools-search-reference.md",
-    "https://developers.notion.com/guides/mcp/tools-pages-reference.md",
-    "https://developers.notion.com/guides/mcp/tools-databases-reference.md",
-    "https://developers.notion.com/guides/mcp/tools-comments-reference.md",
-    "https://developers.notion.com/guides/mcp/tools-files-reference.md",
-    "https://developers.notion.com/guides/mcp/tools-skills-agents-reference.md",
-    "https://developers.notion.com/guides/mcp/tools-calendars-reference.md"
-  ],
-  "provisional": true,
-  "note": "Fed from Notion's documented tool list on 2026-11-05. Replace this file with a tools/list saved from a signed-in server, then run npm run drift -- --strict and update src/notion-tools.ts, jelly.tools and the skills.",
   "tools": [
     {
       "name": "notion-ai-search",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-calendar-cancel-events",
-      "class": "deny",
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true
@@ -29,126 +15,108 @@
     },
     {
       "name": "notion-calendar-create-events",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-calendar-list-calendar-resources",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-calendar-list-calendars",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-calendar-list-contacts",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-calendar-list-coworkers-events",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-calendar-list-events",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-calendar-update-events",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-connector-search",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-convert-page-to-skill",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-create-attachment",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-create-comment",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-create-database",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-create-file-upload",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-create-folder",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-create-pages",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-create-suggested-edit",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-create-view",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-delete-comment",
-      "class": "deny",
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true
@@ -156,7 +124,6 @@
     },
     {
       "name": "notion-delete-databases",
-      "class": "deny",
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true
@@ -164,7 +131,6 @@
     },
     {
       "name": "notion-delete-pages",
-      "class": "deny",
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true
@@ -172,224 +138,192 @@
     },
     {
       "name": "notion-download-attachment",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-download-skill",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-duplicate-page",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-fetch",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-get-async-task",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-get-comments",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-get-enabled-skills",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-get-file-download-urls",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-get-groups",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-get-self",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-get-session-status",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-get-suggested-edit",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-get-teams",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-get-tool-access",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-get-users",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-get-version-changes",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-list-favorite-pages",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-list-page-backlinks",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-list-private-pages",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-list-recent-pages",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-list-session-events",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-list-shared-pages",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-memory-search",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-move-pages",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-query-data-sources",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-query-meeting-notes",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-query-multiple-data-sources",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-query-sessions",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-read-session-event",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-resolve-suggested-edit",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-restore-pages",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-restore-version",
-      "class": "deny",
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true
@@ -397,105 +331,90 @@
     },
     {
       "name": "notion-search",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-search-agents",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-search-sessions",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-send-message-to-session",
-      "class": "deny",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-set-comment-reaction",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-set-discussion-resolved",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-spawn-session",
-      "class": "deny",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-stop-session",
-      "class": "deny",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-update-comment",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-update-data-source",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-update-enabled-skills",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-update-folder",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-update-page",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-update-view",
-      "class": "ask",
       "annotations": {
         "readOnlyHint": false
       }
     },
     {
       "name": "notion-upload-skill",
-      "class": "deny",
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true
@@ -503,14 +422,12 @@
     },
     {
       "name": "notion-view-version",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }
     },
     {
       "name": "notion-wait-session",
-      "class": "allow",
       "annotations": {
         "readOnlyHint": true
       }

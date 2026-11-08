@@ -84,11 +84,12 @@ the plugin is active, that the `notion` server and the default rules are registe
 "Notion", and that the status RPC answers. It then points a copy of the installed plugin at a local fake of Notion and calls
 the tools RPC as a script would.
 
-To use `opencode` binaries you already have, set `OPENCODE_BIN_2_2_3`, `OPENCODE_BIN_2_2_4` and `OPENCODE_BIN_2_2_5`:
+To use `opencode` binaries you already have, set `OPENCODE_BIN_2_2_3` through `OPENCODE_BIN_2_2_6`:
 
 ```sh
 OPENCODE_BIN_2_2_3=/path/to/opencode-2.2.3 OPENCODE_BIN_2_2_4=/path/to/opencode-2.2.4 \
-  OPENCODE_BIN_2_2_5=/path/to/opencode-2.2.5 node scripts/check.mjs pack
+  OPENCODE_BIN_2_2_5=/path/to/opencode-2.2.5 OPENCODE_BIN_2_2_6=/path/to/opencode-2.2.6 \
+  node scripts/check.mjs pack
 ```
 
 Otherwise the stage installs `@opencode/cli` with the binary for your platform (macOS or Linux, arm64 or x64), a few
@@ -98,10 +99,10 @@ CI (`.github/workflows/ci.yml`) runs `npm ci --ignore-scripts` and `npm run chec
 
 ## Notion's tools
 
-`src/notion-tools.ts` is the one record of the Notion tools the plugin knows: `READ_TOOLS` run without a prompt and are the
-tools RPC's methods, `WRITE_TOOLS` ask, `DENY_TOOLS` are off, and `PARAMETERS` holds each tool's input parameters. The
-default rules, the tools RPC, status's unknown and denied tools, the fake server in the host and pack tests, and the checks
-of `jelly.tools`, the docs and the skills all derive from it. Notion adds and changes tools without notice, and a plan or an
+`src/notion-tools.ts` is the one record of the Notion tools the plugin knows: `READ_TOOLS`, `WRITE_TOOLS` and
+`DESTRUCTIVE_TOOLS` give each tool its class, and `PARAMETERS` holds each tool's input parameters. The default rules for
+every `access` value, the tools RPC's methods and classes, status's unknown and destructive tools, the fake server in the
+host and pack tests, and the checks of `jelly.tools`, the docs and the skills all derive from it. Notion adds and changes tools without notice, and a plan or an
 Enterprise tool list can leave tools out, so a known tool missing from one connection's list is not drift.
 
 The names and classes come from Notion's own documentation of its MCP tools
@@ -112,23 +113,25 @@ inputs: in Code Mode each call's signature gives the model the parameter names.
 ### Reconciling with a live tool list
 
 A signed-in connection's `tools/list` is the authority. Save it first, without keeping the credential: an MCP client's
-result for `https://mcp.notion.com/mcp`, as JSON, which also carries Notion's annotations and input schemas. Until then,
-`test/unit/notion-live-tools.json` stands in for it, fed from Notion's documentation. **Replacing that file is the
+result for `https://mcp.notion.com/mcp`, as JSON, `{ "tools": [ { "name", "description", "inputSchema"?,
+"annotations"? } ] }`. That is the one form this repository and the drift script accept, and
+`test/unit/notion-live-tools.json` is the same shape, fed from Notion's documentation. **Replacing that file is the
 reconcile step**: put the saved list in its place, then:
 
 1. Run `npm run drift -- --strict`. It names every live tool with no rule, every class or annotation that disagrees with
    the rules, and every known tool whose input `PARAMETERS` has not recorded, and exits 1 while any of that remains.
-2. Make `READ_TOOLS`, `WRITE_TOOLS` and `DENY_TOOLS` name every tool the list has, once each.
+2. Make `READ_TOOLS`, `WRITE_TOOLS` and `DESTRUCTIVE_TOOLS` name every tool the list has, once each.
 3. A new name is a read only if `readOnlyHint` is true and it neither changes content nor sends anything anywhere. Anything
    that deletes, trashes, replaces a page's content, changes sharing or permissions, or sends data to Notion's team goes to
-   `DENY_TOOLS`. Every other write goes to `WRITE_TOOLS`.
+   `DESTRUCTIVE_TOOLS`. Every other write goes to `WRITE_TOOLS`.
 4. If a read has `readOnlyHint: false`, or a write has `destructiveHint: true`, decide it again and record why in the file's
    comments.
 5. Update `PARAMETERS` from the schemas, `jelly.tools` in `package.json`, and any skill text that names a changed tool. If
    Notion no longer lists `notion-ai-search`, remove it from `READ_TOOLS`; the rule and the script method go with it.
-6. Run `npm run check`. The live-tools test gives every fixture name exactly one rule and proves every deny is hidden; the
-   Jelly test fails if `jelly.tools` differs from the lists; the skills test fails on a tool or parameter the record does
-   not have; and the docs test on a doc that names a tool in no list.
+6. Run `npm run check`. The live-tools test names each difference the reconcile has left — a name with no class, a class
+   the table does not have, an effect the value does not give it, or a deny that is not hidden; the Jelly test fails if
+   `jelly.tools` differs from the lists; the skills test fails on a tool or parameter the record does not have; and the
+   docs test on a doc that names a tool in no list.
 7. Record the change in `CHANGELOG.md`. Moving a tool between the lists changes the default rules and the tools RPC's
    methods, which are part of the plugin's contract.
 

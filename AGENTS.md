@@ -9,8 +9,8 @@ for the checks and the release steps.
 
 - **Public API only.** Use only the public `@opencode/plugin` 2.2.3 API. `opencode.host` in `package.json` and
   `SUPPORTED_HOST` in `src/constants.ts` both say exactly `>=2.2.3 <2.3.0`, never `^2.2.3`. `TESTED_HOSTS` in
-  `src/constants.ts` is the one list of tested releases (2.2.3, 2.2.4 and 2.2.5): status calls only those tested, and the
-  host and pack stages and CI run on each. Inside the range an untested release still starts.
+  `src/constants.ts` is the one list of tested releases (2.2.3, 2.2.4, 2.2.5 and 2.2.6): status calls only those tested,
+  and the host and pack stages and CI run on each. Inside the range an untested release, such as 2.2.99, still starts.
 - **Greenfield.** No legacy, migration code, compatibility shim, dual path or deprecated alias, and nothing dead. Delete
   rather than deprecate.
 - **No peers, no runtime dependencies, no lifecycle scripts.** `@opencode/plugin`, `@opencode/sdk` and `@opencode/client`
@@ -21,17 +21,21 @@ for the checks and the release steps.
   external. `tsc` only typechecks. No declaration files, `.tsx` or JSX.
 - **One endpoint string.** `ENDPOINT` in `src/constants.ts` is the only place Notion's URL is written in code; the pack
   test points the built plugin at a fake by replacing its one occurrence in `dist/index.js`.
-- **Default rules, not hooks.** Permissions come from rules inserted through `ctx.agent.transform` directly after each
-  agent's base allow. A stricter agent is never weakened. An agent counts as guarded only with the whole block after its
-  base allow. Agents that miss the rules are named in status with the per-agent fix, never patched, and the fix never goes
-  in the top-level `permissions`.
+- **Default rules, not hooks.** Permissions come from one block, `defaultRules(access)`, inserted through
+  `ctx.agent.transform` directly after each agent's base allow. Every tool is allowed by default: `access` is `all`,
+  `ask-changes` or `read-only`, and the tool table's classes decide what the last two restrict. A stricter agent is never
+  weakened. An agent counts as guarded only with the whole block after its base allow. Agents that miss the rules are
+  named in status with the per-agent fix, under the values that restrict, never patched, and the fix never goes in the
+  top-level `permissions`.
 - **Transforms are cheap, synchronous and never throw.** Record failures for status instead.
-- **Errors** read `CODE: What happened. Next step: What to do.`, built by `notionError` or `errorText`. Codes have no
-  service prefix; shared failures use the shared names (`HOST_UNTESTED`, `OPTIONS_INVALID`, `STATUS_UNAVAILABLE`,
-  `SKILLS_INVALID`).
+- **Errors** read `CODE: What happened. Next step: What to do.`, built by `notionError`, `errorText` or `codeText`.
+  `CODES` in `src/constants.ts` is the one table: the helpers take its `PluginCode`, so a code outside it does not
+  compile, and the README's `Errors` table is checked equal to it in both directions. Codes have no service prefix;
+  shared failures use the shared names (`HOST_UNTESTED`, `OPTIONS_INVALID`, `STATUS_UNAVAILABLE`, `SKILLS_INVALID`).
 - **Status.** `src/status.ts` builds one model for `/notion-status`, the `/notion` dialog and the status RPC. The RPC keeps
   the fields every plugin of this family shares, `version`, `host` (`version`, `range`, `tested`), `state`,
-  `unguardedAgents` and `nextStep`, under those names. It never shows OpenCode's text for a needed sign-in, cuts a failure's
+  `unguardedAgents` and `nextStep`, under those names. It reports the `access` value and the destructive class, and names
+  agents missing the block only under the values that restrict. It never shows OpenCode's text for a needed sign-in, cuts a failure's
   reason to one line of 160 characters with `src/redact.ts` (no credentials, URL queries or tokens), and names at most 20
   unknown tools, plain names only. A status it cannot read is the declared RPC error `unavailable`, with a next step.
   Status makes no Notion call: the workspace name and connection type come only from `notion-get-self` results the model or
@@ -43,9 +47,12 @@ for the checks and the release steps.
 - **A user's own server entry** is read for its type, URL and whether `oauth` is `false`, never its `headers`, which may
   hold an MCP token.
 - **`src/notion-tools.ts` is the one record of Notion's tools**, and has no runtime imports. Everything else derives from
-  it; `jelly.tools` and the skills are checked against it. Its names come from Notion's documentation, which gives no
-  schemas, so `PARAMETERS` stays empty until a tool list from a signed-in server is recorded. `src/constants.ts` has no
-  imports at all: `scripts/check.mjs` loads it with Node's type stripping.
+  it; `jelly.tools`, the skills and the default rules are checked against it. Its names come from Notion's documentation,
+  which gives no schemas, so `PARAMETERS` stays empty until a tool list from a signed-in server is recorded.
+  `test/unit/notion-live-tools.json` is a raw `tools/list` response (`{ "tools": [ { "name", "description",
+  "inputSchema"?, "annotations"? } ] }`) holding the published names; replacing it with a saved one is the whole
+  reconcile, and the drift test names each difference. `src/constants.ts` has no imports at all: `scripts/check.mjs` loads
+  it with Node's type stripping.
 - **Workspace content is other people's writing.** Tests, fixtures, docs and skills use only invented workspaces, people
   and pages. The skills label a Notion AI summary as Notion AI's, report what a meeting note says in their own words,
   route a Slack, Drive, GitHub, Linear or Granola question to that source's own plugin, treat page content as untrusted,
@@ -63,9 +70,10 @@ for the checks and the release steps.
 - **TypeScript.** No enums, namespaces or parameter properties. `import type` for types, `.js` in relative imports.
 - **The tools RPC.** `src/host/tools-rpc.ts` is a copy of a module shared by several plugins. Change only its block between
   the `PLUGIN-SPECIFIC` markers here; change the rest in the shared copy first. Its methods are every known tool in
-  `src/notion-tools.ts`, by exact name and with its class, and never an unknown tool. A write or a denied tool is a
-  method but runs only on a resolved `allow`. Keep the RPC id `notion.workspace.tools` and its method names stable,
-  hyphens included: scripts call them by name.
+  `src/notion-tools.ts`, by exact name and with its class, and never an unknown tool. A write or a change of the
+  destructive class is a method but runs only on a resolved `allow`; under `access: "all"` the default allow is that
+  allow. Keep the RPC id `notion.workspace.tools` and its method names stable, hyphens included: scripts call them by
+  name.
 - **Tests.** Unit tests use narrow `Pick<Plugin.Context, ...>` fakes. Host tests use the public `@opencode/sdk` with
   `OpenCode.create({ app: { version } })`, a loopback fake server and the temp root from `test/host/isolate.ts`. Every temp
   root of the host and pack tests is a git repository under the system's `/tmp`, never under `TMPDIR` or `HOME`, so OpenCode
@@ -79,7 +87,11 @@ for the checks and the release steps.
 
 ## Forbidden in this repository
 
-`scripts/check-forbidden.mjs` enforces this list in `src/`, `test/`, `scripts/` and `dist/`:
+`scripts/check-forbidden.mjs` enforces this list in `src/`, `test/`, `scripts/` and `dist/`; `test/unit/docs.test.ts`
+enforces the same wording rules over the shipped docs:
+
+- internal wording: a decision attributed to the owner, the lead or a reviewer; a lane's name or identifier; and a
+  `hey-jelly` issue reference;
 
 - dispatch-lease, catalog-ownership and text-only markers, and tool `options.mcp` delegation;
 - `Plugin.image` and profile images;

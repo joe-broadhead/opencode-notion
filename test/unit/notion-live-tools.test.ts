@@ -1,48 +1,63 @@
-// The committed fixture stands in for a live tools/list until the owner signs in. Every name in it must have exactly one
-// rule, and the nine denies must be hidden; replacing it with the signed-in list is the whole reconcile step.
+// The reconcile's safety test: replacing test/unit/notion-live-tools.json with a saved tools/list response is the whole
+// reconcile step, and this test then names each difference — a name with no class, a class the table does not have, an
+// effect the value does not give it, or a deny that is not hidden.
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { classify, DENY_TOOLS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
-import { defaultRules, evaluate, type Rule } from "../../src/permissions.js"
+import { classify, DESTRUCTIVE_TOOLS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
+import { ACCESS, defaultRules, effectOf, evaluate, type Rule } from "../../src/permissions.js"
 
-const FIXTURE = JSON.parse(readFileSync(new URL("./notion-live-tools.json", import.meta.url), "utf8")) as {
-  provisional?: boolean
-  tools: { name: string; class?: string }[]
-}
+const FIXTURE = JSON.parse(readFileSync(new URL("./notion-live-tools.json", import.meta.url), "utf8")) as { tools: { name: string }[] }
+/** The live names, without a `notion_` prefix, whatever shape the capture came in. */
+const LIVE = FIXTURE.tools.map((tool) => tool.name.replace(/^notion_/, "")).sort()
+const ALL = [...READ_TOOLS, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS]
 const BASE: Rule = { action: "*", resource: "*", effect: "allow" }
-const rules = [BASE, ...defaultRules()]
-const ACTION = (name: string) => `notion_${name}`
-const effectOf = (kind: string) => (kind === "read" ? "allow" : kind === "write" ? "ask" : "deny")
+/** The last rule that matches an action on `*`: the one the host applies. */
+const last = (rules: readonly Rule[], action: string) =>
+  rules.findLast((rule) => (rule.action === action || rule.action === "notion_*" || rule.action === "*") && rule.resource === "*")
+const hidden = (rules: readonly Rule[], action: string) => {
+  const rule = last(rules, action)
+  return rule?.resource === "*" && rule.effect === "deny"
+}
 
-/** The last rule that matches the action on every resource: what OpenCode decides, and what a deny hides. */
-const lastRule = (action: string) => rules.findLast((rule) => rule.action === action || rule.action === "notion_*")
-
-describe("the live-tools fixture", () => {
-  test("names every known tool once, and nothing else", () => {
-    const names = FIXTURE.tools.map((tool) => tool.name)
-    expect(new Set(names).size).toBe(names.length)
-    expect([...names].sort()).toEqual([...READ_TOOLS, ...WRITE_TOOLS, ...DENY_TOOLS].sort())
+describe("a saved live tool list", () => {
+  test("replacing test/unit/notion-live-tools.json with a saved tools/list is the whole reconcile", () => {
+    const unclassified = LIVE.filter((name) => classify(name) === "unknown")
+    const unlisted = ALL.filter((name) => !LIVE.includes(name))
+    const listsOf = (name: string) => [READ_TOOLS, WRITE_TOOLS, DESTRUCTIVE_TOOLS].filter((list) => list.includes(name)).length
+    const misplaced = LIVE.filter((name) => listsOf(name) !== 1).map((name) => ({ name, lists: listsOf(name) }))
+    const wrongEffect = ACCESS.flatMap((access) => {
+      const rules = [BASE, ...defaultRules(access)]
+      return LIVE.filter((name) => classify(name) !== "unknown").map((name) => ({ access, name, effect: evaluate(rules, `notion_${name}`) })).filter(({ name, effect }) => effect !== effectOf(name, access))
+    })
+    const notHidden = ACCESS.flatMap((access) => {
+      const rules = [BASE, ...defaultRules(access)]
+      return DESTRUCTIVE_TOOLS.filter((name) => LIVE.includes(name) && access === "read-only" && !hidden(rules, `notion_${name}`)).map((name) => ({ access, name }))
+    })
+    expect({ unclassified, unlisted, misplaced, wrongEffect, notHidden }).toEqual({ unclassified: [], unlisted: [], misplaced: [], wrongEffect: [], notHidden: [] })
   })
 
-  test("gives every tool exactly one rule: reads allow, writes ask, the nine denies deny", () => {
-    for (const { name, class: listed } of FIXTURE.tools) {
-      const kind = classify(name)
-      expect({ name, rule: evaluate(rules, ACTION(name)) }).toEqual({ name, rule: effectOf(kind) })
-      if (listed !== undefined) expect({ name, listed }).toEqual({ name, listed: kind === "denied" ? "deny" : kind === "write" ? "ask" : "allow" })
+  test("the fixture is the raw tools/list form, names each tool once and has no provisional flag", () => {
+    expect(new Set(LIVE).size).toBe(LIVE.length)
+    expect(LIVE.length).toBeGreaterThan(50)
+    expect(Object.keys(FIXTURE)).toEqual(["tools"])
+    expect(FIXTURE.tools.every((tool) => typeof tool.name === "string")).toBe(true)
+  })
+
+  test("every access value gives a read allow and the destructive class its own effect", () => {
+    for (const access of ACCESS) {
+      const rules = [BASE, ...defaultRules(access)]
+      for (const name of READ_TOOLS) expect({ access, name, effect: evaluate(rules, `notion_${name}`) }).toEqual({ access, name, effect: "allow" })
+      for (const name of WRITE_TOOLS) expect({ access, name, effect: evaluate(rules, `notion_${name}`) }).toEqual({ access, name, effect: access === "all" ? "allow" : access === "ask-changes" ? "ask" : "deny" })
+      for (const name of DESTRUCTIVE_TOOLS) {
+        const expected = access === "all" ? "allow" : access === "ask-changes" ? "ask" : "deny"
+        expect({ access, name, effect: evaluate(rules, `notion_${name}`) }).toEqual({ access, name, effect: expected })
+      }
     }
   })
 
-  test("hides every deny from the model, and only ask or allow reaches a write", () => {
-    for (const name of DENY_TOOLS) {
-      const last = lastRule(ACTION(name))
-      expect({ name, hidden: last?.resource === "*" && last.effect === "deny" }).toEqual({ name, hidden: true })
-    }
-    for (const name of WRITE_TOOLS) expect({ name, effect: evaluate(rules, ACTION(name)) }).toEqual({ name, effect: "ask" })
-    for (const name of READ_TOOLS) expect({ name, hidden: lastRule(ACTION(name))?.effect === "deny" }).toEqual({ name, hidden: false })
-  })
-
-  test("is the provisional table until a signed-in list replaces it", () => {
-    expect(FIXTURE.provisional).toBe(true)
-    expect(FIXTURE.tools).toHaveLength(71)
+  test("read-only hides every destructive tool from the model, and allows every read", () => {
+    const rules = [BASE, ...defaultRules("read-only")]
+    for (const name of DESTRUCTIVE_TOOLS) expect({ name, hidden: hidden(rules, `notion_${name}`) }).toEqual({ name, hidden: true })
+    for (const name of READ_TOOLS) expect({ name, hidden: hidden(rules, `notion_${name}`) }).toEqual({ name, hidden: false })
   })
 })

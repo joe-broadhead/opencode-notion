@@ -28,22 +28,23 @@ family's own drawing, not Notion's logo, shape or brand colour.
 
 ## Tools and permissions
 
-71 tools are declared (39 read-only), every tool in `src/notion-tools.ts`: each read tool as read-only with `allow`, each
-write tool with `ask`, and each denied tool with `deny`. Jelly's agents have no base "allow everything" rule, so this
-plugin's own default rules, which it puts after that rule, never reach them. Jelly writes each declared `ask` or `deny` as
-that tool's default instead (the person's own choice replaces it), and denies a read-only helper every tool not marked
-`readOnly`. A declared `allow` changes nothing in Jelly.
+71 tools are declared (39 read-only), every tool in `src/notion-tools.ts`: each tool with `allow`, and only the reads
+marked `readOnly`, which is what a read-only helper is allowed to run. Jelly's agents have no base "allow everything"
+rule, so this plugin's own default rules, which it puts after that rule, never reach them; the declaration is the whole
+posture. A declared `allow` changes nothing in Jelly, which already runs what Jelly's own settings permit.
 
-- Ask: the 23 changes, such as `notion_notion-update-page` (a property or content change everyone with access sees),
+Every declared tool is allowed, so nothing is switched off for you. These deserve their own sentence:
+
+- The 23 writes, such as `notion_notion-update-page` (a property or content change everyone with access sees),
   `notion_notion-create-comment` (a comment, whose mention notifies someone) and `notion_notion-move-pages` (access can
   change with the new parent).
-- Off: `notion_notion-delete-pages`, `notion_notion-delete-databases`, `notion_notion-delete-comment` (trash),
-  `notion_notion-restore-version` (replaces a whole page), `notion_notion-upload-skill` (replaces a Skill page),
-  `notion_notion-spawn-session`, `notion_notion-send-message-to-session`, `notion_notion-stop-session` (a Custom Agent) and
+- The nine destructive tools: `notion_notion-delete-pages`, `notion_notion-delete-databases`,
+  `notion_notion-delete-comment` (trash), `notion_notion-restore-version` (replaces a whole page),
+  `notion_notion-upload-skill` (replaces a Skill page), `notion_notion-spawn-session`,
+  `notion_notion-send-message-to-session`, `notion_notion-stop-session` (a Custom Agent) and
   `notion_notion-calendar-cancel-events` (an event others see).
-- Everything else runs, as the plugin's own rules let it.
 
-A tool Notion adds later, a write included, is not declared, so in Jelly it is not asked about: it runs without asking,
+A tool Notion adds later, a write included, is not declared, so in Jelly it runs with the plugin's own default: allowed,
 even if it changes something such as a page's whole content, until a new version of this plugin declares it. Notion adds
 tools over time, write actions included. A Jelly admin can set such a tool to ask. Keep `jelly.tools` in step with
 `src/notion-tools.ts`; `test/unit/jelly.test.ts` checks the list against it, and each declared effect against the plugin's

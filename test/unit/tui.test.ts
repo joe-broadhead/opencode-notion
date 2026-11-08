@@ -104,7 +104,7 @@ describe("TUI plugin", () => {
 
 describe("status view", () => {
   test("shows the server's status, the same text as /notion-status without its heading, in a large dialog", async () => {
-    const answer = status({ account: { workspace: "Acme Robotics", connection: "person" }, agents: [{ id: "reviewer", permissions: [{ action: "*", resource: "*", effect: "allow" }] }] })
+    const answer = status({ account: { workspace: "Acme Robotics", connection: "person" }, access: "read-only", agents: [{ id: "reviewer", permissions: [{ action: "*", resource: "*", effect: "allow" }] }] })
     const view = fake({ answer: async () => answer })
     setupView(view.context)
     await command(view.layers).run()

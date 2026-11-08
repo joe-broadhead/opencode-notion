@@ -1,4 +1,4 @@
-// A loopback Streamable-HTTP MCP server. By default it lists one known read, one known write, every denied tool and one
+// A loopback Streamable-HTTP MCP server. By default it lists one known read, one known write, every destructive tool and one
 // tool the plugin has never seen. With `catalog: "notion"` it lists every tool in src/notion-tools.ts and the new tool.
 // It answers JSON-RPC POSTs with plain JSON (no SSE stream) and records every tool call, its path and every request
 // header. A `tools/call` answers with the tool's name, the path and its arguments as structured content; for a `query`
@@ -12,7 +12,7 @@
 // calls Notion's tools.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
 import type { AddressInfo } from "node:net"
-import { DENY_TOOLS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
+import { DESTRUCTIVE_TOOLS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
 
 const schema = { type: "object", properties: { query: { type: "string" } } }
 /** A tool the plugin has never seen. */
@@ -23,8 +23,8 @@ export const SAMPLE_READ = "notion-search"
 export const SAMPLE_WRITE = "notion-create-comment"
 /** The account read the plugin captures status from. */
 export const ACCOUNT_READ = "notion-get-self"
-const TOOLS = [tool(SAMPLE_READ, true), tool(ACCOUNT_READ, true), ...WRITE_TOOLS.map((name) => tool(name, false)), ...DENY_TOOLS.map((name) => tool(name, false)), { ...NEW_TOOL, inputSchema: schema }]
-const CATALOG = [...READ_TOOLS.map((name) => tool(name, true)), ...[...WRITE_TOOLS, ...DENY_TOOLS].map((name) => tool(name, false)), { ...NEW_TOOL, inputSchema: schema }]
+const TOOLS = [tool(SAMPLE_READ, true), tool(ACCOUNT_READ, true), ...WRITE_TOOLS.map((name) => tool(name, false)), ...DESTRUCTIVE_TOOLS.map((name) => tool(name, false)), { ...NEW_TOOL, inputSchema: schema }]
+const CATALOG = [...READ_TOOLS.map((name) => tool(name, true)), ...[...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS].map((name) => tool(name, false)), { ...NEW_TOOL, inputSchema: schema }]
 
 /** The upstream error a "fail" query gets: two lines, the first with a signed URL. */
 export const UPSTREAM_FAILURE = "Notion refused https://www.notion.so/files/a.pdf?signature=fake-signature-123 for this input\nTraceback: second line"

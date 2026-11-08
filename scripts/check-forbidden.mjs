@@ -23,6 +23,8 @@ const RULES = [
   { id: "generate-text", pattern: new RegExp(String.raw`\bgenerate${MEMBER}text\b`), why: "ctx.generate.text is deprecated" },
   { id: "experimental-policies", pattern: new RegExp(String.raw`\bexperimental${MEMBER}policies\b`), why: "experimental.policies is deprecated" },
   { id: "opencode-ai-import", pattern: /["'`]@opencode\/ai(?:\/[^"'`]*)?["'`]/, why: "@opencode/ai breaks between patch releases; import only @opencode/plugin" },
+  // Internal wording: shipped text states behaviour, never who decided it, and never a lane's name.
+  { id: "internal-wording", pattern: /\bowner(?:'s)? (?:decision|ruling|sign-off|call)\b|\bthe lead(?:'s)? (?:decision|ruling|audit|report|review)\b|\bhey-jelly\s*#|\b(?:audit|review|reconcile) lane\s+[A-Z]\d\b|\blane\s+G\d\b/i, why: "no internal wording: state the behaviour, not who decided it, and name no lane" },
   // The tools RPC's evaluate hook only turns an ask on one of its own script calls in flight into a deny, because no one
   // can answer it. It is allowed there, and in the bundle that inlines it, exactly once (counted below).
   { id: "permission-hook", pattern: PERMISSION_HOOK, why: "no escalating permission hook; default rules go through ctx.agent.transform", except: TOOLS_RPC },

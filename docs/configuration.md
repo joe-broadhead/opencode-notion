@@ -18,6 +18,24 @@ To set options, use the object form:
 
 ## Options
 
+Set options with the object form of the plugin entry:
+
+```json
+{
+  "plugins": [{ "package": "@joe-broadhead/opencode-notion", "options": { "access": "ask-changes" } }]
+}
+```
+
+### `access`
+
+- Type: `"all"`, `"ask-changes"` or `"read-only"`.
+- Default: `"all"`.
+
+How much the default rules restrict. `all` allows every Notion tool; `ask-changes` allows a read and asks for every other
+tool; `read-only` allows a read and denies every other tool, which also hides it from the model. The classes come from
+`src/notion-tools.ts`, so the value decides a tool Notion adds later too. [Permissions](#permissions) has the three
+generated blocks.
+
 ### `allowUntestedHost`
 
 - Type: `true` or `false`.
@@ -40,7 +58,7 @@ its `OpenCode` row, for example `2.2.5 (tested; supported range >=2.2.3 <2.3.0)`
 - **Outside the range with `"allowUntestedHost": true`:** it starts anyway, and `/notion-status` and `/notion` show a
   warning.
 
-There is no other option. To narrow what the model may do in Notion, use permission rules; see
+There is no other option. To narrow what the model may do in Notion per agent or per tool, use permission rules; see
 [Permissions](#permissions).
 
 ## Your own `mcp.servers.notion`
@@ -101,95 +119,81 @@ gives the next step:
 ## Permissions
 
 OpenCode asserts every MCP call itself, with the action `notion_<tool>` and the resource `*`. Notion's own tool names
-start `notion-`, so each action is double-prefixed: `notion-search` becomes `notion_notion-search`. The plugin adds these
-rules to every agent that starts with the base rule `{ "action": "*", "resource": "*", "effect": "allow" }`, directly
-after that rule:
+start `notion-`, so each action is double-prefixed: `notion-search` becomes `notion_notion-search`. The plugin adds its
+block to every agent that starts with the base rule `{ "action": "*", "resource": "*", "effect": "allow" }`, directly
+after that rule. The README prints the whole block, rule for rule, in
+[Permissions](https://github.com/joe-broadhead/opencode-notion/blob/HEAD/README.md#permissions); `/notion-status` prints
+it too, and its `Agents without default rules` row prints it as a list to paste.
 
-```json
-[
-  { "action": "notion_*", "resource": "*", "effect": "ask" },
-  { "action": "notion_notion-search", "resource": "*", "effect": "allow" },
-  { "action": "notion_notion-fetch", "resource": "*", "effect": "allow" },
-  { "action": "notion_notion-delete-pages", "resource": "*", "effect": "deny" },
-  { "action": "notion_notion-update-page", "resource": "*", "effect": "ask" }
-]
-```
+`READ_TOOLS` in `src/notion-tools.ts` lists Notion's read tools, `WRITE_TOOLS` its write tools, and `DESTRUCTIVE_TOOLS`
+the nine that `access: "read-only"` denies and `access: "ask-changes"` asks for. A tool Notion adds later matches
+`notion_*` alone, and takes the same value's effect. `/notion-status` names the tools in no list. A plan or an Enterprise
+tool list can leave out tools the plugin knows, so a known tool missing from one connection is normal.
 
-That sample leaves out the other read allows, which sit between the two shown, and the other deny rules; `/notion-status`
-prints the whole block, and its `Agents without default rules` row prints it as a list to paste.
+**Every tool is allowed by default**, so nothing is switched off for you. These deserve their own sentence before you
+decide:
 
-`READ_TOOLS` in `src/notion-tools.ts` lists Notion's read tools, `WRITE_TOOLS` its write tools, and `DENY_TOOLS` the nine
-that are off. Writes and tools that Notion adds later match only `notion_*`, so they ask. `/notion-status` names the tools
-in no list. A plan or an Enterprise tool list can leave out tools the plugin knows, so a known tool missing from one
-connection is normal.
+- `notion_notion-delete-pages`, `notion_notion-delete-databases` and `notion_notion-delete-comment` trash something
+  everyone with access can see. Trash is recoverable only until the workspace's retention passes.
+- `notion_notion-restore-version` replaces a whole page with a past version: every edit after that time is lost,
+  including other people's, and the comments added since.
+- `notion_notion-upload-skill` replaces a Skill page's title, Description, body and Files.
+- `notion_notion-spawn-session`, `notion_notion-send-message-to-session` and `notion_notion-stop-session` drive a Notion
+  Custom Agent that acts in the workspace with your permissions and spends AI credits.
+- `notion_notion-calendar-cancel-events` removes an event from other people's calendars and may notify them.
 
-`notion_notion-update-page` is the routine change and stays at `ask`, although it also carries the command that replaces a
-whole page's content. No permission rule can see an argument, so the guard is a rule: `notion-write` never sends that
-command unless the user asked to replace the whole page, and says in one line what will be removed first. An owner who
-wants it stricter can deny the tool and edit in Notion instead:
+There are three ways to restrict the block, and everything later still wins:
 
-```json
-{ "permissions": [{ "action": "notion_notion-update-page", "resource": "*", "effect": "deny" }] }
-```
+1. the `access` option, for the whole plugin;
+2. the agent's own `permissions`, for one agent;
+3. your top-level `permissions`, which OpenCode adds to every agent.
 
-The write tools, which ask:
+### `access`
 
-- `notion-create-pages`, `notion-duplicate-page` and `notion-move-pages` add or move pages that others see. A new page in
-  a teamspace inherits its permissions, and a moved page inherits access from its new parent, so people can gain or lose
-  access.
-- `notion-create-comment`, `notion-update-comment`, `notion-create-suggested-edit`, `notion-set-comment-reaction`,
-  `notion-set-discussion-resolved` and `notion-resolve-suggested-edit` write on a page others read; a mention notifies the
-  person, and a suggestion opens a discussion thread.
-- `notion-create-database`, `notion-update-data-source`, `notion-create-view` and `notion-update-view` change a database
-  everyone with access uses. An update to a data source removes any select or status option it omits.
-- `notion-create-file-upload`, `notion-create-attachment`, `notion-create-folder`, `notion-update-folder`,
-  `notion-convert-page-to-skill` and `notion-update-enabled-skills` add or change files and the Skills a connection
-  offers.
-- `notion-restore-pages` takes a page out of Trash.
-- `notion-calendar-create-events` and `notion-calendar-update-events` may notify attendees.
+| Value | What runs |
+| --- | --- |
+| `all` (the default) | every Notion tool runs without a prompt |
+| `ask-changes` | a read runs; every other tool asks, including one Notion adds later |
+| `read-only` | a read runs; every other tool is denied, and hidden from the model |
 
-The deny rules turn nine tools off:
+The value generates the block from the tool table's classes, so `/notion` and `/notion-status` always show what is in
+force; the README prints the three blocks in full. A namespace rule (`notion_*`) comes first, and each known tool's own
+rule after it, so a tool Notion adds later takes the value's own effect.
 
-- `notion-delete-pages`, `notion-delete-databases` and `notion-delete-comment` trash something everyone with access can
-  see. Trash is recoverable only until the workspace's retention passes.
-- `notion-restore-version` replaces a whole page with a past version: every edit after that time is lost, including other
-  people's, and the comments added since.
-- `notion-upload-skill` replaces a Skill page's title, Description, body and Files.
-- `notion-spawn-session`, `notion-send-message-to-session` and `notion-stop-session` drive a Notion Custom Agent that acts
-  in the workspace with your permissions and spends AI credits.
-- `notion-calendar-cancel-events` removes an event from other people's calendars and may notify them.
+### Recipes
 
-To turn one on, add a rule that makes it ask to the agent's own `permissions`, which come after the plugin's block in that
-agent. Each call then asks. Every opt-in rule, for the build agent:
+To restrict one agent, put the rules in that agent's own `permissions`; a top-level `ask` or `allow` would reach every
+agent, Explore included. A read-only agent that asks for one change:
 
 ```json
 {
   "agents": {
     "build": {
       "permissions": [
-        { "action": "notion_notion-delete-pages", "resource": "*", "effect": "ask" },
-        { "action": "notion_notion-delete-databases", "resource": "*", "effect": "ask" },
-        { "action": "notion_notion-delete-comment", "resource": "*", "effect": "ask" },
-        { "action": "notion_notion-restore-version", "resource": "*", "effect": "ask" },
-        { "action": "notion_notion-upload-skill", "resource": "*", "effect": "ask" },
-        { "action": "notion_notion-spawn-session", "resource": "*", "effect": "ask" },
-        { "action": "notion_notion-send-message-to-session", "resource": "*", "effect": "ask" },
-        { "action": "notion_notion-stop-session", "resource": "*", "effect": "ask" },
-        { "action": "notion_notion-calendar-cancel-events", "resource": "*", "effect": "ask" }
+        { "action": "notion_*", "resource": "*", "effect": "ask" },
+        { "action": "notion_notion-search", "resource": "*", "effect": "allow" },
+        { "action": "notion_notion-fetch", "resource": "*", "effect": "allow" },
+        { "action": "notion_notion-create-comment", "resource": "*", "effect": "ask" }
       ]
     }
   }
 }
 ```
 
-Use only the rules you need.
+Never replace a whole page from OpenCode, in any agent (a `deny` also hides the tool):
 
-Don't put these in the top-level `permissions`: a top-level rule comes after every agent's own rules, so it would reach
-every agent, Explore included, which otherwise can't use Notion. For an agent that exists only in your config, put them
-after the plugin's block (see [Agents that miss the rules](#agents-that-miss-the-rules)).
+```json
+[{ "action": "notion_notion-update-page", "resource": "*", "effect": "deny" }]
+```
 
-Use only the rules you need. Never make a denied tool `allow`, and don't answer "Always allow" when it asks: OpenCode would
-save an allow for every agent in the project, and every later delete or whole-page restore would run unasked.
+**A permission rule matches a tool's name, not its arguments.** `notion_notion-update-page` is the routine change, and it
+also carries the command that replaces a whole page's content. No rule can see that argument, so the guard is
+`notion-write`: it never sends it unless the user asked to replace the whole page, and says in one line what will be
+removed first. With `ask-changes` or `read-only` a rule cannot see it either, so read the input shown in the prompt
+before you answer yes, or deny the tool as above.
+
+Use only the rules you need. Never answer "Always allow" for a destructive tool: OpenCode would save an allow for every
+agent in the project, and every later delete or whole-page restore would run unasked.
 
 OpenCode uses the last rule that matches, so everything after the plugin's rules wins:
 
@@ -200,54 +204,21 @@ OpenCode uses the last rule that matches, so everything after the plugin's rules
 A `deny` on resource `*` also hides the tool from the model. In an unattended run such as `opencode run`, a tool that asks
 is refused. An agent without the base rule gets no Notion rules and keeps its own behaviour.
 
-### Recipes
-
-A `deny` can go in the top-level `permissions` of `opencode.json`: it applies to every agent, and only tightens. An
-`allow` or `ask` goes in the agent's own `permissions`: a top-level one would reach every agent, Explore included.
-
-Never replace a whole page from OpenCode, in any agent (a `deny` also hides the tool):
-
-```json
-[{ "action": "notion_notion-update-page", "resource": "*", "effect": "deny" }]
-```
-
-No write tool gets an `allow` recipe here, and none should be saved: an "Always allow" answer covers every agent in the
-project, and it is exactly what lets a change that reaches other people run unasked. In an unattended run such as
-`opencode run`, a write that asks is refused, so run writes interactively, where the permission prompt is the yes.
-
-A strict agent where every Notion tool asks, reads included: put these in that agent's own `permissions`, after the block.
-The last match wins, so the `notion_*` ask alone would turn the denied tools into asks too; repeating their denies after it
-keeps them off:
-
-```json
-[
-  { "action": "notion_*", "resource": "*", "effect": "ask" },
-  { "action": "notion_notion-delete-pages", "resource": "*", "effect": "deny" },
-  { "action": "notion_notion-delete-databases", "resource": "*", "effect": "deny" },
-  { "action": "notion_notion-delete-comment", "resource": "*", "effect": "deny" },
-  { "action": "notion_notion-restore-version", "resource": "*", "effect": "deny" },
-  { "action": "notion_notion-upload-skill", "resource": "*", "effect": "deny" },
-  { "action": "notion_notion-spawn-session", "resource": "*", "effect": "deny" },
-  { "action": "notion_notion-send-message-to-session", "resource": "*", "effect": "deny" },
-  { "action": "notion_notion-stop-session", "resource": "*", "effect": "deny" },
-  { "action": "notion_notion-calendar-cancel-events", "resource": "*", "effect": "deny" }
-]
-```
-
 ### Agents that miss the rules
 
 OpenCode creates agents that exist only in your config after plugins add their rules, so those agents get no Notion rules;
 agents that a later plugin adds are in the same position. An agent counts as guarded when the plugin's whole block appears
-anywhere after its base allow. `/notion-status` and `/notion` list every other agent that has a base allow and where a new
-Notion tool would run without asking, by name, followed by the default rules to paste. The next step reads:
+anywhere after its base allow. Under `access: "all"` that changes nothing, because the block restates the base allow;
+under `ask-changes` or `read-only`, `/notion-status` and `/notion` list every other agent that has a base allow and where
+a new Notion tool would run unrestricted, by name, followed by the default rules to paste. The next step reads:
 
 ```text
 Put the default rules shown by /notion-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Notion tools.
 ```
 
 Put the block first in that agent's own `permissions`, then repeat after it any top-level rules you have for `notion_*`
-tools, so yours keep winning. Never put the block in the top-level `permissions`: top-level rules come after every agent's
-own rules, so it would loosen Explore. For an agent `reviewer`, with one top-level rule of your own:
+tools, so yours keep winning. Never put the block in the top-level `permissions`: top-level rules come after every
+agent's own rules, so it would loosen Explore. For an agent `reviewer`, with one top-level rule of your own:
 
 ```json
 {
@@ -259,7 +230,6 @@ own rules, so it would loosen Explore. For an agent `reviewer`, with one top-lev
       "permissions": [
         { "action": "notion_*", "resource": "*", "effect": "ask" },
         { "action": "notion_notion-search", "resource": "*", "effect": "allow" },
-        { "action": "notion_notion-fetch", "resource": "*", "effect": "allow" },
         { "action": "notion_notion-delete-pages", "resource": "*", "effect": "deny" }
       ]
     }
@@ -267,8 +237,8 @@ own rules, so it would loosen Explore. For an agent `reviewer`, with one top-lev
 }
 ```
 
-Copy the full block from your own `/notion-status` output: the sample above keeps the first two read allows and your own
-rule, and leaves out the other 37.
+Copy the full block from your own `/notion-status` output: the sample above keeps the first read allow and your own rule,
+and leaves out the rest.
 
 ## Errors
 
@@ -281,12 +251,12 @@ Every error from the plugin reads `CODE: What happened. Next step: What to do.`
 | `STATUS_UNAVAILABLE` | `/notion-status`, `/notion` or the status RPC: the status could not be read, or the plugin is not running on the server. The RPC answers with its error `unavailable`. | The message's own next step: restart OpenCode and run the command again, or, when the plugin is not running, run `/plugins` to see why. |
 | `SKILLS_INVALID` | Setup: a skill file is missing or broken. The plugin still starts; status shows the problem. | Reinstall the plugin. |
 | `SERVER_NOT_REGISTERED` | Setup: the `notion` server could not be registered. Status shows the problem. | Restart OpenCode. |
-| `RULES_NOT_ADDED` | Setup: the default permission rules could not be added, so Notion tools may run without asking. Status shows the problem. | Restart OpenCode. |
+| `RULES_NOT_ADDED` | Setup: the default permission rules could not be added. Status shows the problem. | Restart OpenCode. |
 
 For example:
 
 ```text
-OPTIONS_INVALID: Unknown option "apiKey". Accepted options: "allowUntestedHost". Next step: Fix the plugin options in opencode.json, for example "plugins": [{ "package": "@joe-broadhead/opencode-notion", "options": { "allowUntestedHost": true } }].
+OPTIONS_INVALID: Unknown option "apiKey". Accepted options: "allowUntestedHost", "access". Next step: Fix the plugin options in opencode.json, for example "plugins": [{ "package": "@joe-broadhead/opencode-notion", "options": { "access": "ask-changes" } }].
 ```
 
 Errors from Notion's server and from OpenCode pass through unchanged, except in the tools RPC for scripts, whose codes are
@@ -304,26 +274,27 @@ holds no token, no header and no URL query, and makes no Notion call. `version`,
 | Field | Content |
 | --- | --- |
 | `version` | The plugin's version |
+| `access` | The `access` value in force: `all`, `ask-changes` or `read-only`. |
 | `state` | `connected`, `sign_in_required`, `connecting`, `disabled`, `failed`, `not_configured` or `conflict`. The `Connection` row shows the same states as `connected`, `sign-in required`, `connecting`, `disabled`, `failed`, `not configured` and `conflict`. |
 | `error` | For a failed connection only: OpenCode's reason, on one line of at most 160 characters, with any URL cut before its query. The text for a needed sign-in can hold an authorization URL, so it is never shown. |
 | `source` | `type` (`plugin`, `adopted` or `conflict`), `url`, `signIn` (`oauth`, or `own` for an entry with `"oauth": false`, such as an MCP token), and for a conflict the `expected` URL |
 | `workspace` | The workspace's name from the last `notion-get-self` call since OpenCode started, or `null` before one. The plugin makes no call of its own. |
 | `connection` | `person` for your own sign-in, `bot` for a workspace connection whose admin chose its tool list, or `null` before an account read. |
-| `tools` | How many Notion tools OpenCode lists that the default rules let run or ask: the listed ones, without the denied ones |
-| `deniedTools` | The listed tools that the default rules deny. The `Tools` row shows them as "off by default"; your own later `ask` rule may have turned one on. |
+| `tools` | How many Notion tools OpenCode lists that the plugin knows; a tool Notion adds is counted under `unknownCount`. |
+| `destructiveTools` | The listed tools of the destructive class. What happens to them follows `access`. `deniedTools` carries the same list under its old name. |
 | `listing` | True while a server that connected moments ago lists no tools yet. The next step is then to run `/notion-status` again in a few seconds, not to ask an admin. |
 | `unknownCount`, `unknownTools` | How many of them the plugin does not know, and at most 20 of their names, only those made of lowercase letters, digits, `_` and `-` |
-| `unguardedAgents` | Agents where a new Notion tool would run without asking; empty when there are none. An agent whose own rules already ask or deny for every Notion tool is not listed. |
+| `unguardedAgents` | Agents where a new Notion tool would run unrestricted under `ask-changes` or `read-only`; always empty under `all`, where the block restates the base allow. An agent whose own rules already ask or deny for every Notion tool is not listed. |
 | `shadowedSkills` | Present only when a skill with one of the plugin's ids, such as your own `notion` skill, replaces the plugin's: each `id` and the `path` OpenCode loads instead |
 | `host` | `version` (`null` if OpenCode reports none), `range` (the supported range) and `tested` (true only for 2.2.3, 2.2.4, 2.2.5 and 2.2.6) |
 | `problems` | Setup problems, each `CODE: What happened. Next step: What to do.` |
 | `nextStep` | Exactly one next step: the `Next step` row, `Nothing to do.` when nothing is needed |
 
-The `Access` row states the posture the default rules fix, from the tool lists: reads run without asking; every change and
-any new tool ask first; and the tools that delete, replace a whole page, upload a Skill, drive a Notion agent or cancel an
-event are off. Then it says whether that connection is a person's or a workspace connection's, when an account read has
-said so, and whether those rules are in place: "no agent runs new Notion tools unasked", "default rules missing in the
-agents listed below", or "default rules not added (see the OpenCode row)".
+The `Access` row starts with the `access` value and the posture it gives, from the tool lists: "access all: every Notion
+tool is allowed, reads and changes alike", or under `read-only`, "reads run without asking; the 23 writes and the 9
+destructive tools are denied". Then it says whether that connection is a person's or a workspace connection's, when an
+account read has said so, and whether those rules are in place: "every agent has the block", "default rules missing in
+the agents listed below", or "default rules not added (see the OpenCode row)".
 
 A sign-in that worked and then needed a new one adds a sentence to the next step: Notion revokes the whole grant when a
 refresh token is reused, which two OpenCode processes sharing one sign-in do, so signing out and in again once is the fix.

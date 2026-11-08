@@ -20,10 +20,10 @@ All notable changes to this project are documented here. The format follows [Kee
   sign-in.
 - Adopts your own `mcp.servers.notion` at Notion's URL unchanged, including an entry that carries an MCP token in its
   headers. The plugin never reads those headers. Any other URL, or a local command, is a conflict that status explains.
-- Default permission rules after each agent's base allow: every Notion tool asks, and Notion's 39 read tools run without a
-  prompt. Nine tools are denied: the three deletes, `notion_notion-restore-version` (it replaces a whole page),
-  `notion_notion-upload-skill` (it replaces a Skill page), the three Custom Agent session tools, and the calendar cancel. The docs
-  give the rule that turns each back on as an ask.
+- Default permission rules after each agent's base allow: every Notion tool is allowed, reads, writes, the nine
+  destructive tools and the Custom Agent sessions alike, and the namespace pattern covers a tool Notion adds later. The
+  `access` option restricts them: `all` (the default), `ask-changes` allows a read and asks for everything else, and
+  `read-only` denies everything but a read.
 - The workspace name and connection type in status, from the last `notion-get-self` call the model or a script made. The
   plugin makes no call of its own, and reads nothing else of the result.
 - `/notion-status` and the `/notion` dialog ("Notion: Status" in the palette): connection, account, access, tools, agents
@@ -31,12 +31,12 @@ All notable changes to this project are documented here. The format follows [Kee
   new one explains a revoked grant, which reusing a rotated refresh token causes. A skill of yours with one of the
   plugin's ids is named, with a next step.
 - The status RPC `notion.workspace/status`, with the fields this family of plugins shares.
-- The tools RPC `notion.workspace.tools`, which lets scripts call Notion's read tools with no model, as a session and its
-  agent. Its method names keep Notion's hyphens.
+- The tools RPC `notion.workspace.tools`, which lets scripts call Notion's tools with no model, each under a prior
+  explicit allow, as a session and its agent. Its method names keep Notion's hyphens.
 - Two skills: `notion` (searching and reading pages and databases, citing them, meeting notes, Notion's connected sources,
   and the rules for other people's content) and `notion-write` (whom each change reaches, said before the call, and never
   replacing a whole page unless the user asked for that).
-- The option `allowUntestedHost`, and a host check for OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4 and 2.2.5.
+- The options `access` and `allowUntestedHost`, and a host check for OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6.
 - A `jelly` declaration for Jelly: the tools with their default effects, the skills, the sign-in, a summary and an icon.
 - The family icon kit's mark and its 128 and 256 pixel rasters, declared in `opencode.icons` and exported from the
   package, with `opencode.vendor` naming Notion's domain: a display app may show Notion's own logo from Notion's site,

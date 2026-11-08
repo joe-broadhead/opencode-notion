@@ -33,22 +33,22 @@ import { Rpc } from "@opencode/plugin/rpc"
 
 // >>> PLUGIN-SPECIFIC >>>
 import { ACCOUNT_TOOL, captureAccount } from "../account.js"
-import { DENY_TOOLS, READ_TOOLS, WRITE_TOOLS } from "../notion-tools.js"
+import { DESTRUCTIVE_TOOLS, READ_TOOLS, WRITE_TOOLS } from "../notion-tools.js"
 import { PLUGIN_ID as NOTION_PLUGIN_ID, SERVER_NAME } from "../constants.js"
 
 /** The plugin's id. The RPC id is `<PLUGIN_ID>.tools`. */
 export const PLUGIN_ID = NOTION_PLUGIN_ID
 
 /**
- * Every known Notion tool, by exact name, from the plugin's one table: the reads, the writes that ask, and the nine
- * tools the default rules deny. A tool Notion adds later is never a method until it is classified in
- * `src/notion-tools.ts`; `describe` lists it as unclassified. The names keep Notion's hyphens: the host registers them
- * under exactly these names. The class never decides whether a call runs: the rules do.
+ * Every known Notion tool, by exact name, from the plugin's one table: the reads, the writes, and the nine of the
+ * destructive class. A tool Notion adds later is never a method until it is classified in `src/notion-tools.ts`;
+ * `describe` lists it as unclassified. The names keep Notion's hyphens: the host registers them under exactly these
+ * names. The class never decides whether a call runs: the rules do.
  */
 export const METHODS: readonly MethodSpec[] = [
   ...READ_TOOLS.map((name): MethodSpec => ({ kind: "mcp", name, class: "read" })),
   ...WRITE_TOOLS.map((name): MethodSpec => ({ kind: "mcp", name, class: "write" })),
-  ...DENY_TOOLS.map((name): MethodSpec => ({ kind: "mcp", name, class: "destructive" })),
+  ...DESTRUCTIVE_TOOLS.map((name): MethodSpec => ({ kind: "mcp", name, class: "destructive" })),
 ]
 
 /** What the model path's `execute.before` hooks do to an MCP call's arguments. Notion has no such hook. */

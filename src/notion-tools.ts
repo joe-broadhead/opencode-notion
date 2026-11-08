@@ -1,15 +1,18 @@
 // Every fact the plugin keeps about Notion's tools: their names, without the `notion_` server prefix, and what each
-// one does. The default rules, the tools RPC's methods, status's unknown and denied tools and the tests all derive
+// one does. The default rules, the tools RPC's methods, status's unknown and destructive tools and the tests all derive
 // from these lists; `jelly.tools` in package.json and the skills' call examples are checked against them. Keep this
 // file free of runtime imports.
 //
 // The names and classes come from Notion's own documentation of its MCP tools (developers.notion.com, "MCP supported
 // tools" and the per-category references, 2026-11-05). That documentation gives no input schemas and names only three
 // annotations, so each tool's class comes from what Notion says it does, and PARAMETERS stays empty until a tool list
-// from a signed-in server is recorded (CONTRIBUTING.md, "Updating the tool lists"). A plan or an Enterprise tool list
-// can leave out tools this file knows: a known tool missing from a live list is normal and never reported.
+// from a signed-in server is recorded (CONTRIBUTING.md, "Reconciling with a live tool list"). A plan or an Enterprise
+// tool list can leave out tools this file knows: a known tool missing from a live list is normal and never reported.
 
-/** Known reads: each only reads, by Notion's description, and sends nothing beyond its query. They run without asking. */
+/**
+ * Known reads: each only reads, by Notion's description, and sends nothing beyond its query. `access: "all"` and
+ * `ask-changes` allow them; `read-only` allows them too, being the one class it leaves alone.
+ */
 export const READ_TOOLS: readonly string[] = [
   "notion-ai-search",
   "notion-calendar-list-calendar-resources",
@@ -53,13 +56,13 @@ export const READ_TOOLS: readonly string[] = [
 ]
 
 /**
- * Known writes: they ask before they run. Each changes what someone else can see, or notifies someone: page content and
- * properties, comments and suggested edits, database properties and views, files, calendar events, or the Skills a
- * connection offers.
+ * Known writes. Each changes what someone else can see, or notifies someone: page content and properties, comments and
+ * suggested edits, database properties and views, files, calendar events, or the Skills a connection offers.
+ * `access: "all"` allows them like everything else; `ask-changes` asks for each call and `read-only` denies them.
  *
  * `notion-resolve-suggested-edit` carries `destructiveHint: true` in Notion's documentation and stays here rather than
- * off: it accepts or discards one person's proposal on one page, which a permission prompt can describe, unlike a
- * whole-page write. Its skill line says to name the author and which of the two the user wants.
+ * in the destructive class: it accepts or discards one person's proposal on one page, which a rule or a prompt can
+ * describe, unlike a whole-page write. Its skill line says to name the author and which of the two the user wants.
  */
 export const WRITE_TOOLS: readonly string[] = [
   "notion-calendar-create-events",
@@ -88,7 +91,8 @@ export const WRITE_TOOLS: readonly string[] = [
 ]
 
 /**
- * Off by default; a deny also hides them. A user or organisation turns one back on with a later `ask` rule for it.
+ * The destructive class: allowed by default like every other tool, and what `access: "read-only"` denies and
+ * `access: "ask-changes"` asks for on each call. A later rule of the user's still turns one back on.
  * - Three delete pages, databases or a comment, and a delete takes them away from everyone who could see them.
  * - `notion-restore-version` replaces a whole page with a past version, losing every later edit, including other
  *   people's, and the comments added since.
@@ -97,7 +101,7 @@ export const WRITE_TOOLS: readonly string[] = [
  *   cannot describe and AI credits it cannot count.
  * - `notion-calendar-cancel-events` removes an event from other people's calendars and may notify them.
  */
-export const DENY_TOOLS: readonly string[] = [
+export const DESTRUCTIVE_TOOLS: readonly string[] = [
   "notion-calendar-cancel-events",
   "notion-delete-comment",
   "notion-delete-databases",
@@ -117,11 +121,14 @@ export const DENY_TOOLS: readonly string[] = [
  */
 export const PARAMETERS: Readonly<Record<string, readonly string[]>> = {}
 
-type ToolClass = "read" | "write" | "denied" | "unknown"
+/** Every known tool, in the order the default rules list them. */
+export const ALL_TOOLS: readonly string[] = [...READ_TOOLS, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS]
+
+type ToolClass = "read" | "write" | "destructive" | "unknown"
 
 export function classify(name: string): ToolClass {
   if (READ_TOOLS.includes(name)) return "read"
   if (WRITE_TOOLS.includes(name)) return "write"
-  if (DENY_TOOLS.includes(name)) return "denied"
+  if (DESTRUCTIVE_TOOLS.includes(name)) return "destructive"
   return "unknown"
 }
