@@ -154,7 +154,7 @@ describe("setup", () => {
     for (const words of [
       "Read the notion skill before the first call",
       'call them as tools["notion"]["notion-search"]',
-      "Every Notion tool is allowed by default",
+      "By default every Notion tool is allowed",
       "before any change, load notion-write and say in your reply what it does and whom it reaches",
       "Deletes, restoring an old version over a page, Skill uploads, Custom Agent sessions and event cancellations are the destructive class",
       "The Notion calendar tools read the calendars connected to Notion, a second path to the user's own",

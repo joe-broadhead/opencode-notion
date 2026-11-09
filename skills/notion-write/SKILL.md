@@ -7,7 +7,7 @@ If Notion's tools are absent, run `/connect` and choose Notion, or on Jelly call
 
 Make a Notion change only when the user asked for it. Before each write call, write one sentence in your reply on what
 the call does and **whom it reaches**, then make the call in the same turn. That sentence is chat text, not a question.
-Every Notion tool is allowed by default, so a change can run with no prompt: your sentence is the only warning. Under
+By default every Notion tool is allowed, so a change can run with no prompt; the `access` option decides otherwise. Your sentence is the only warning. Under
 `access: "ask-changes"` the prompt is the user's yes, and `read-only` denies the call. Ask in chat first only when
 something must be chosen: which page, which database, which workspace. Declined: say nothing changed and whom it would have
 reached, then offer a draft or a retry, never a workaround.
