@@ -569,7 +569,7 @@ The status RPC's own error is `unavailable`, with a next step, when the status c
   Notion adds is allowed at once and counted as unknown; a tool Notion changes to change data can run here as a read
   until a release knows it. `test/unit/notion-live-tools.json` is a raw `tools/list` response, and `npm run drift` is
   the check that reconciles the table with a saved one: replace the file and run `npm run drift -- --strict`.
-  `CONTRIBUTING.md` has the work.
+  The table has not been checked against a signed-in server's tool list yet. `CONTRIBUTING.md` has the work.
 - **One sign-in per workspace.** Notion rotates the refresh token on every use, and reusing one that has been rotated
   away revokes the whole grant. Two separate OpenCode processes on one credential can therefore revoke it for each
   other: run one OpenCode process per sign-in, or sign out and in again when one has revoked it. The sign-in also ends
