@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- Both skills explain how to connect Notion when its tools are absent, including possible Enterprise approval.
+
 - Default permission rules after each agent's base allow: every Notion tool is allowed, reads, writes, the nine
   destructive tools and the Custom Agent sessions alike, and the namespace pattern covers a tool Notion adds later. The
   `access` option restricts them: `all` (the default), `ask-changes` allows a read and asks for everything else, and

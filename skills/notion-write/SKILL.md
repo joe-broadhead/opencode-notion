@@ -2,7 +2,7 @@
 name: notion-write
 description: Load before any Notion change - creating or editing a page or its properties, replacing page content, creating or changing a database, its properties or a view, adding, editing or resolving a comment or suggested edit, moving, duplicating or restoring a page, uploading a file or creating a folder, creating or updating a Notion Calendar event, or when the user asks to delete, restore a version, or hand work to a Notion agent.
 ---
-
+If Notion's tools are absent, run `/connect` and choose Notion, or on Jelly call jelly_connection_request. An Enterprise admin may need to approve OpenCode first.
 # Changes in Notion
 
 Make a Notion change only when the user asked for it. Before each write call, write one sentence in your reply on what
