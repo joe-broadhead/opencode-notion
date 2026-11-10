@@ -291,7 +291,7 @@ holds no token, no header and no URL query, and makes no Notion call. `version`,
 | `nextStep` | Exactly one next step: the `Next step` row, `Nothing to do.` when nothing is needed |
 
 The `Access` row starts with the `access` value and the posture it gives, from the tool lists: "access all: every Notion
-tool is allowed, reads and changes alike", or under `read-only`, "reads run without asking; the 23 writes and the 9
+tool is allowed, reads and changes alike", or under `read-only`, "reads run without asking; the 29 writes and the 9
 destructive tools are denied". Then it says whether that connection is a person's or a workspace connection's, when an
 account read has said so, and whether those rules are in place: "every agent has the block", "default rules missing in
 the agents listed below", or "default rules not added (see the OpenCode row)".

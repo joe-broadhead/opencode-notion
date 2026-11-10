@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- The tool table follows Notion's live tool list: two reads and seven writes are added, and the Skills tool that enables and disables Skills is now `notion-update-skill-settings`. `notion-ai-search` and `notion-connector-search` stay declared as reads, because Notion lists them only on some connections and plans.
 - Both skills explain how to connect Notion when its tools are absent, including possible Enterprise approval.
 
 - Default permission rules after each agent's base allow: every Notion tool is allowed, reads, writes, the nine
