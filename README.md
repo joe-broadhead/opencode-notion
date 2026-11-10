@@ -35,12 +35,16 @@ opencode plugin add github:joe-broadhead/opencode-notion#v0.0.0
 Run `opencode reload`, or restart OpenCode. Then run `/notion-status`: it shows `sign-in required` until you sign in
 (see [Sign in](#sign-in)).
 
+A Git install is removed and updated by its installed spec: `opencode plugin remove github:joe-broadhead/opencode-notion#v0.0.0`. `opencode plugin update` and `opencode plugin check` take the same spec.
+
 The plugin registers Notion's MCP server under the name `notion`, adds default permission rules, the `/notion-status`
 command, the `/notion` status view and two skills. Every tool is Notion's, and OpenCode handles the connection, the
 sign-in and the stored credentials.
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
 A new release is a new tag: install it with its own `#v<version>` spec.
+
+**Update** with `opencode plugin update github:joe-broadhead/opencode-notion#v0.0.0`, then run `opencode reload`. An entry pinned to a tag does not move: to take a newer release, install its own `#v<version>` spec.
 
 ## Sign in
 
@@ -120,7 +124,7 @@ There are three ways to restrict it.
 ```json
 {
   "plugins": [
-    { "package": "@joe-broadhead/opencode-notion", "options": { "access": "ask-changes" } }
+    { "package": "github:joe-broadhead/opencode-notion#v0.0.0", "options": { "access": "ask-changes" } }
   ]
 }
 ```
@@ -481,7 +485,7 @@ Set options with the object form of the plugin entry:
 
 ```json
 {
-  "plugins": [{ "package": "@joe-broadhead/opencode-notion", "options": { "allowUntestedHost": true } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.0", "options": { "allowUntestedHost": true } }]
 }
 ```
 
@@ -501,7 +505,7 @@ macOS, or `/etc/opencode/opencode.json` on Linux. This example also turns off de
 
 ```json
 {
-  "plugins": ["@joe-broadhead/opencode-notion"],
+  "plugins": ["github:joe-broadhead/opencode-notion#v0.0.0"],
   "permissions": [{ "action": "notion_notion-delete-pages", "resource": "*", "effect": "deny" }]
 }
 ```
@@ -617,7 +621,7 @@ store.
    `/connect` → **Notion**. If it answers `MCP server not found: notion`, OpenCode is still opening that folder: wait a
    few seconds and run it again.
 2. Check: `opencode auth list` no longer lists **Notion**.
-3. Remove the plugin: `opencode plugin remove @joe-broadhead/opencode-notion`, then `opencode reload`. `opencode mcp list`
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-notion#v0.0.0`, then `opencode reload`. `opencode mcp list`
    no longer lists `notion`.
 4. Remove any Notion rules you copied into your agents' own `permissions`.
 
