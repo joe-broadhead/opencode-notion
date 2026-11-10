@@ -29,7 +29,7 @@ Unofficial; not affiliated with Notion.
 ## Install
 
 ```sh
-opencode plugin add @joe-broadhead/opencode-notion
+opencode plugin add github:joe-broadhead/opencode-notion#v0.0.0
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/notion-status`: it shows `sign-in required` until you sign in
@@ -39,8 +39,8 @@ The plugin registers Notion's MCP server under the name `notion`, adds default p
 command, the `/notion` status view and two skills. Every tool is Notion's, and OpenCode handles the connection, the
 sign-in and the stored credentials.
 
-**Update** with `opencode plugin update @joe-broadhead/opencode-notion`, then run `opencode reload`. An entry pinned to a
-version does not update: remove the `@version` from its `plugins` entry first.
+The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
+A new release is a new tag: install it with its own `#v<version>` spec.
 
 ## Sign in
 
