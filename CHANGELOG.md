@@ -19,6 +19,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- Jelly shows an `access` setting (`all`, `ask-changes` or `read-only`; `all` by default), the option the plugin already reads.
 - Registers Notion's official MCP server, `https://mcp.notion.com/mcp`, as `notion`, signed in with OpenCode's own MCP
   OAuth. OpenCode signs in with its client ID metadata document and asks the one scope Notion names, `default`, so there
   is no client ID or key to configure.
