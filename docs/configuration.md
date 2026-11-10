@@ -4,7 +4,7 @@ Every option is optional. The smallest setup is one entry in `plugins`:
 
 ```json
 {
-  "plugins": ["github:joe-broadhead/opencode-notion#v0.0.0"]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.0" }]
 }
 ```
 

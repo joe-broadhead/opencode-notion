@@ -35,7 +35,13 @@ opencode plugin add github:joe-broadhead/opencode-notion#v0.0.0
 Run `opencode reload`, or restart OpenCode. Then run `/notion-status`: it shows `sign-in required` until you sign in
 (see [Sign in](#sign-in)).
 
-A Git install is removed and updated by its installed spec: `opencode plugin remove github:joe-broadhead/opencode-notion#v0.0.0`. `opencode plugin update` and `opencode plugin check` take the same spec.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-notion#v0.0.0`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-notion#v<version>`.
+
+Or add the plugin to `opencode.json` instead, with the same spec:
+
+```json
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.0" }] }
+```
 
 The plugin registers Notion's MCP server under the name `notion`, adds default permission rules, the `/notion-status`
 command, the `/notion` status view and two skills. Every tool is Notion's, and OpenCode handles the connection, the
@@ -43,8 +49,6 @@ sign-in and the stored credentials.
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
 A new release is a new tag: install it with its own `#v<version>` spec.
-
-**Update** with `opencode plugin update github:joe-broadhead/opencode-notion#v0.0.0`, then run `opencode reload`. An entry pinned to a tag does not move: to take a newer release, install its own `#v<version>` spec.
 
 ## Sign in
 
@@ -505,7 +509,7 @@ macOS, or `/etc/opencode/opencode.json` on Linux. This example also turns off de
 
 ```json
 {
-  "plugins": ["github:joe-broadhead/opencode-notion#v0.0.0"],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.0" }],
   "permissions": [{ "action": "notion_notion-delete-pages", "resource": "*", "effect": "deny" }]
 }
 ```
@@ -610,6 +614,8 @@ The status RPC's own error is `unavailable`, with a next step, when the status c
   scripts in the project whose agent you mean. This is in the module shared with the other plugins, not in this one.
 - **In Jelly, a tool Notion adds is not asked about.** Jelly applies each declared tool's effect and nothing else, so an
   undeclared tool, a write included, runs with the plugin's own default. A Jelly admin can set it to ask.
+
+- Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
 
 ## Uninstall
 
