@@ -680,8 +680,19 @@ describe("a server that asks for a sign-in", () => {
     // Read the account while the signed-in connection works, so the later challenge is one that had a working sign-in:
     // this is the revoked-grant case, which the account clear on needs_auth must not erase.
     const sessionID = await session(host)
-    await scriptCall(host, ACCOUNT_READ, { sessionID, input: {} })
-    await until("the workspace is read", async () => ((await statusRpc(host)).workspace === "Acme Robotics" ? true : undefined), 180_000)
+    // The read is retried until it is served. The server can report itself connected before OpenCode lists the read
+    // tool, and a read that lands in that gap captures no account; the last answer goes into the failure message.
+    let answer = ""
+    await until(
+      "the workspace is read",
+      async () => {
+        answer = await scriptCall(host, ACCOUNT_READ, { sessionID, input: {} })
+        return (await statusRpc(host)).workspace === "Acme Robotics" ? true : undefined
+      },
+      180_000,
+    ).catch((error: unknown) => {
+      throw new Error(`${error instanceof Error ? error.message : String(error)}; the last read answered: ${answer.slice(0, 300)}`)
+    })
     // The tokens stop working: the next connection gets the challenge.
     host.fake.challenge = true
     const mcp = host.client.mcp as unknown as Record<"connect" | "disconnect", (input: object) => Promise<unknown>>
