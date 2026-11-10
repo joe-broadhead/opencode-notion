@@ -56,6 +56,9 @@
       }
     },
     {
+      "name": "notion-complete-mcp-setup"
+    },
+    {
       "name": "notion-connector-search",
       "annotations": {
         "readOnlyHint": true
@@ -66,6 +69,9 @@
       "annotations": {
         "readOnlyHint": false
       }
+    },
+    {
+      "name": "notion-convert-to-meetings-database"
     },
     {
       "name": "notion-create-attachment",
@@ -96,6 +102,9 @@
       "annotations": {
         "readOnlyHint": false
       }
+    },
+    {
+      "name": "notion-create-meeting-note"
     },
     {
       "name": "notion-create-pages",
@@ -203,6 +212,12 @@
       }
     },
     {
+      "name": "notion-get-setup-guide"
+    },
+    {
+      "name": "notion-get-sidebar-tabs"
+    },
+    {
       "name": "notion-get-suggested-edit",
       "annotations": {
         "readOnlyHint": true
@@ -231,6 +246,9 @@
       "annotations": {
         "readOnlyHint": true
       }
+    },
+    {
+      "name": "notion-link-meeting-note-to-calendar-event"
     },
     {
       "name": "notion-list-favorite-pages",
@@ -390,12 +408,6 @@
       }
     },
     {
-      "name": "notion-update-enabled-skills",
-      "annotations": {
-        "readOnlyHint": false
-      }
-    },
-    {
       "name": "notion-update-folder",
       "annotations": {
         "readOnlyHint": false
@@ -406,6 +418,15 @@
       "annotations": {
         "readOnlyHint": false
       }
+    },
+    {
+      "name": "notion-update-page-favorites"
+    },
+    {
+      "name": "notion-update-sidebar-tabs"
+    },
+    {
+      "name": "notion-update-skill-settings"
     },
     {
       "name": "notion-update-view",

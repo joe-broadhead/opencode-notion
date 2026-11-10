@@ -11,7 +11,7 @@ describe("npm run drift", () => {
   test("finds no drift between the fixture and the tool lists", () => {
     const result = run("--strict")
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain("The list holds 71 tools: 39 read, 23 write, 9 destructive, 0 with no rule.")
+    expect(result.stdout).toContain("The list holds 79 tools: 41 read, 29 write, 9 destructive, 0 with no rule.")
     expect(result.stdout).toContain("No drift.")
   })
 

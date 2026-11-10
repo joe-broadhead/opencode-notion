@@ -197,6 +197,18 @@
         "readOnly": true
       },
       {
+        "name": "notion.notion-get-setup-guide",
+        "permission": "notion_notion-get-setup-guide",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "notion.notion-get-sidebar-tabs",
+        "permission": "notion_notion-get-sidebar-tabs",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
         "name": "notion.notion-get-suggested-edit",
         "permission": "notion_notion-get-suggested-edit",
         "effect": "allow",
@@ -341,8 +353,20 @@
         "readOnly": false
       },
       {
+        "name": "notion.notion-complete-mcp-setup",
+        "permission": "notion_notion-complete-mcp-setup",
+        "effect": "allow",
+        "readOnly": false
+      },
+      {
         "name": "notion.notion-convert-page-to-skill",
         "permission": "notion_notion-convert-page-to-skill",
+        "effect": "allow",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-convert-to-meetings-database",
+        "permission": "notion_notion-convert-to-meetings-database",
         "effect": "allow",
         "readOnly": false
       },
@@ -377,6 +401,12 @@
         "readOnly": false
       },
       {
+        "name": "notion.notion-create-meeting-note",
+        "permission": "notion_notion-create-meeting-note",
+        "effect": "allow",
+        "readOnly": false
+      },
+      {
         "name": "notion.notion-create-pages",
         "permission": "notion_notion-create-pages",
         "effect": "allow",
@@ -397,6 +427,12 @@
       {
         "name": "notion.notion-duplicate-page",
         "permission": "notion_notion-duplicate-page",
+        "effect": "allow",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-link-meeting-note-to-calendar-event",
+        "permission": "notion_notion-link-meeting-note-to-calendar-event",
         "effect": "allow",
         "readOnly": false
       },
@@ -443,12 +479,6 @@
         "readOnly": false
       },
       {
-        "name": "notion.notion-update-enabled-skills",
-        "permission": "notion_notion-update-enabled-skills",
-        "effect": "allow",
-        "readOnly": false
-      },
-      {
         "name": "notion.notion-update-folder",
         "permission": "notion_notion-update-folder",
         "effect": "allow",
@@ -457,6 +487,24 @@
       {
         "name": "notion.notion-update-page",
         "permission": "notion_notion-update-page",
+        "effect": "allow",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-update-page-favorites",
+        "permission": "notion_notion-update-page-favorites",
+        "effect": "allow",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-update-sidebar-tabs",
+        "permission": "notion_notion-update-sidebar-tabs",
+        "effect": "allow",
+        "readOnly": false
+      },
+      {
+        "name": "notion.notion-update-skill-settings",
+        "permission": "notion_notion-update-skill-settings",
         "effect": "allow",
         "readOnly": false
       },

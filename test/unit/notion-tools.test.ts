@@ -11,8 +11,24 @@ describe("Notion's tool lists", () => {
     for (const list of [READ_TOOLS, WRITE_TOOLS, DESTRUCTIVE_TOOLS]) expect([...list]).toEqual([...list].sort())
   })
 
-  test("hold the 39 reads, 23 writes and 9 destructive tools Notion documents", () => {
-    expect([READ_TOOLS.length, WRITE_TOOLS.length, DESTRUCTIVE_TOOLS.length]).toEqual([39, 23, 9])
+  test("hold the 41 reads, 29 writes and 9 destructive tools", () => {
+    expect([READ_TOOLS.length, WRITE_TOOLS.length, DESTRUCTIVE_TOOLS.length]).toEqual([41, 29, 9])
+  })
+
+  test("class the tools the live list added as their descriptions say, and keep the two plan-gated searches as reads", () => {
+    for (const tool of ["notion-get-setup-guide", "notion-get-sidebar-tabs"]) expect(classify(tool)).toBe("read")
+    for (const tool of [
+      "notion-complete-mcp-setup",
+      "notion-convert-to-meetings-database",
+      "notion-create-meeting-note",
+      "notion-link-meeting-note-to-calendar-event",
+      "notion-update-page-favorites",
+      "notion-update-sidebar-tabs",
+      "notion-update-skill-settings",
+    ]) expect(classify(tool)).toBe("write")
+    expect(classify("notion-ai-search")).toBe("read")
+    expect(classify("notion-connector-search")).toBe("read")
+    expect(classify("notion-update-enabled-skills")).toBe("unknown")
   })
 
   test("classify each tool by its list, and everything else as unknown", () => {
