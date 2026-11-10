@@ -93,6 +93,6 @@ apps to an approved list.
 ## Scripts
 
 Scripts run the reads through the tools RPC `notion.workspace.tools`, one call at a time, as a session made for them
-(`opencode api post /api/session -d '{"title":"…","agent":"build"}'`, keep `data.id`). Never borrow an existing session
+(`opencode api post /api/session -d '{"title":"…","agent":"build","location":{"directory":"/path/to/project"}}'`, keep `data.id`). Never borrow an existing session
 found through history or a list.
 https://raw.githubusercontent.com/joe-broadhead/opencode-notion/HEAD/docs/scripting.md

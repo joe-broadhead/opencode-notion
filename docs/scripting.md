@@ -41,11 +41,11 @@ decide what its model sees: the agent's rules, then the session's, and the last 
   `"read-only"`, or narrow the session's own rules, when a script should not change anything. An agent defined only in
   your config gets no default rules; `/notion-status` names it.
 
-Create the session once, with the agent the script runs as, and keep its id. Never reuse a session found through history
+Create the session once, with the agent the script runs as, and keep its id. Give the project as the session's `location`: a session made without one belongs to the service's default location, where the project's agents may not exist, and each call then fails `Agent not found`. Never reuse a session found through history
 or a list: the script would run as that session's agent, under its rules.
 
 ```sh
-opencode api post /api/session -d '{"title":"weekly tracker","agent":"build"}'
+opencode api post /api/session -d '{"title":"weekly tracker","agent":"build","location":{"directory":"/path/to/project"}}'
 ```
 
 Session rules come after the agent's, so a session can narrow what its script may do, or grant one action in a
@@ -53,7 +53,7 @@ narrowly written session. This one can search and fetch
 pages, and nothing else in Notion:
 
 ```sh
-opencode api post /api/session -d '{"title":"weekly tracker","agent":"build","permissions":[
+opencode api post /api/session -d '{"title":"weekly tracker","agent":"build","location":{"directory":"/path/to/project"},"permissions":[
   {"action":"notion_*","resource":"*","effect":"deny"},
   {"action":"notion_notion-search","resource":"*","effect":"allow"},
   {"action":"notion_notion-fetch","resource":"*","effect":"allow"}
