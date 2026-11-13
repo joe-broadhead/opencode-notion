@@ -29,7 +29,7 @@ Unofficial; not affiliated with Notion.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-notion#v0.0.0
+opencode plugin add github:joe-broadhead/opencode-notion#v0.0.1
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/notion-status`: it shows `sign-in required` until you sign in
@@ -40,7 +40,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.0" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.1" }] }
 ```
 
 The plugin registers Notion's MCP server under the name `notion`, adds default permission rules, the `/notion-status`
@@ -128,7 +128,7 @@ There are three ways to restrict it.
 ```json
 {
   "plugins": [
-    { "package": "github:joe-broadhead/opencode-notion#v0.0.0", "options": { "access": "ask-changes" } }
+    { "package": "github:joe-broadhead/opencode-notion#v0.0.1", "options": { "access": "ask-changes" } }
   ]
 }
 ```
@@ -489,7 +489,7 @@ Set options with the object form of the plugin entry:
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.0", "options": { "allowUntestedHost": true } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.1", "options": { "allowUntestedHost": true } }]
 }
 ```
 
@@ -509,7 +509,7 @@ macOS, or `/etc/opencode/opencode.json` on Linux. This example also turns off de
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.0" }],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.1" }],
   "permissions": [{ "action": "notion_notion-delete-pages", "resource": "*", "effect": "deny" }]
 }
 ```
@@ -615,6 +615,8 @@ The status RPC's own error is `unavailable`, with a next step, when the status c
 - **In Jelly, a tool Notion adds is not asked about.** Jelly applies each declared tool's effect and nothing else, so an
   undeclared tool, a write included, runs with the plugin's own default. A Jelly admin can set it to ask.
 
+- **Jelly's settings need a recent Jelly.** The `jelly` settings declare their choices, which a Jelly without app#1301
+  does not read: it refuses the plugin's declaration.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
 
 ## Uninstall
@@ -627,7 +629,7 @@ store.
    `/connect` → **Notion**. If it answers `MCP server not found: notion`, OpenCode is still opening that folder: wait a
    few seconds and run it again.
 2. Check: `opencode auth list` no longer lists **Notion**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-notion#v0.0.0`, then `opencode reload`. `opencode mcp list`
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-notion#v0.0.1`, then `opencode reload`. `opencode mcp list`
    no longer lists `notion`.
 4. Remove any Notion rules you copied into your agents' own `permissions`.
 
