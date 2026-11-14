@@ -31,18 +31,18 @@ Notion is a trademark of Notion Labs, Inc.; this unofficial plugin is not endors
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-notion#v0.0.1
+opencode plugin add github:joe-broadhead/opencode-notion#v0.0.2
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/notion-status`: it shows `sign-in required` until you sign in
 (see [Sign in](#sign-in)).
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-notion#v0.0.0`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-notion#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-notion#v0.0.1`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-notion#v<version>`.
 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.1" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.2" }] }
 ```
 
 The plugin registers Notion's MCP server under the name `notion`, adds default permission rules, the `/notion-status`
@@ -130,7 +130,7 @@ There are three ways to restrict it.
 ```json
 {
   "plugins": [
-    { "package": "github:joe-broadhead/opencode-notion#v0.0.1", "options": { "access": "ask-changes" } }
+    { "package": "github:joe-broadhead/opencode-notion#v0.0.2", "options": { "access": "ask-changes" } }
   ]
 }
 ```
@@ -491,7 +491,7 @@ Set options with the object form of the plugin entry:
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.1", "options": { "allowUntestedHost": true } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.2", "options": { "allowUntestedHost": true } }]
 }
 ```
 
@@ -511,7 +511,7 @@ macOS, or `/etc/opencode/opencode.json` on Linux. This example also turns off de
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.1" }],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.2" }],
   "permissions": [{ "action": "notion_notion-delete-pages", "resource": "*", "effect": "deny" }]
 }
 ```
@@ -633,7 +633,7 @@ store.
    `/connect` → **Notion**. If it answers `MCP server not found: notion`, OpenCode is still opening that folder: wait a
    few seconds and run it again.
 2. Check: `opencode auth list` no longer lists **Notion**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-notion#v0.0.1`, then `opencode reload`. `opencode mcp list`
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-notion#v0.0.2`, then `opencode reload`. `opencode mcp list`
    no longer lists `notion`.
 4. Remove any Notion rules you copied into your agents' own `permissions`.
 

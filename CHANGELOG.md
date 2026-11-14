@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.0.2] - 2026-11-14
 
 ### Added
 
@@ -21,6 +21,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - `docs/jelly.md` says Notion rotates the refresh token on every use, so a sign-in copied to another engine or agent
   signs the person out: one sign-in per engine.
 - The icon is now Notion's own logo, as notion.com's header draws it, in place of the family's page-with-a-folded-corner mark; `opencode.vendor.mark` is `true`.
+- OpenCode support is unchanged: `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6.
 
 ## [0.0.1] - 2026-11-13
 

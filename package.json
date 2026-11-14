@@ -1,6 +1,6 @@
 {
   "name": "@joe-broadhead/opencode-notion",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Unofficial OpenCode plugin for Notion: search, read and edit your workspace's pages, databases, comments and files through Notion's official MCP server",
   "keywords": [
