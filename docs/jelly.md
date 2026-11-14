@@ -8,8 +8,7 @@ Jelly names the plugin **Notion** (`jelly.title`), with the package name and ver
 that name it shows the one line in `jelly.summary`, and beside it the mark in `jelly.icon`
 (`assets/icon.svg`, shipped in the package): Jelly reads that file once, when it records the
 plugin, and keeps it only if it is a clean SVG of drawing elements, with no script, style, link
-or outside reference. The mark is a neutral page with a folded corner on a slate tile, not
-Notion's logo. Jelly's declaration contracts drop a top-level key they don't know, and refuse an
+or outside reference. The mark is Notion's own logo, as notion.com draws it. Jelly's declaration contracts drop a top-level key they don't know, and refuse an
 unknown key inside a tool, sign-in or `contributes` entry, so the section uses only the keys Jelly
 reads.
 
@@ -22,9 +21,9 @@ The three files are also exported as `./icon.svg`, `./icon-128.png` and `./icon-
 can resolve them from the installed package, and all three are in the published tarball.
 
 `opencode.vendor` names the service behind the plugin: `{ "id": "notion", "name": "Notion", "domain":
-"notion.so" }`. A display app may show the vendor's official logo from the vendor's own site, under
-the vendor's terms, using that domain. The package carries no vendor marks: every shipped file is this
-family's own drawing, not Notion's logo, shape or brand colour.
+"notion.so", "mark": true }`. `mark: true` says the icon is the vendor's own mark: the Notion logo from notion.com's
+own header, its paths unchanged, its CSS-variable fill replaced by the site's own value (#000), and its 33×34 canvas
+centred on a 34×34 square without scaling. The README carries the trademark line.
 
 ## Tools and permissions
 

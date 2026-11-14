@@ -61,12 +61,12 @@ for the checks and the release steps.
   `icon`, with only the keys Jelly reads: its contracts drop an unknown top-level key, and refuse an unknown key inside a
   tool, sign-in or `contributes` entry. `test/unit/jelly.test.ts` keeps it in step with the tool lists and the default
   rules.
-- **The icon** is this family's own mark, from the family icon kit: `assets/icon.svg`, a neutral page with a folded
-  corner on a slate tile, with the `icon-128.png` and `icon-256.png` rasters rendered from it, no Notion logo, shape or
-  brand colour, because the plugin is unofficial. `opencode.icons` declares all three and `opencode.vendor` names
-  Notion's domain, so a display app may fetch Notion's official logo from Notion's own site; the package carries no
-  vendor marks. `scripts/check-icons.mjs` is the kit's check, copied verbatim, and is the one definition of a safe
-  icon: it runs in the `icons` stage of `npm run check`.
+- **The icon** is Notion's own logo, as notion.com's header draws it: `assets/icon.svg` keeps its paths unchanged,
+  with the CSS-variable fill replaced by the site's own value (#000) and the 33×34 canvas centred on a 34×34 square
+  without scaling. The `icon-128.png` and `icon-256.png` rasters are rendered from it. `opencode.vendor.mark` is
+  `true`, so the README carries the trademark line. Do not recolour, redraw or combine it. `scripts/check-icons.mjs`
+  is the kit's check, copied verbatim, and is the one definition of a safe icon: it runs in the `icons` stage of
+  `npm run check`.
 - **TypeScript.** No enums, namespaces or parameter properties. `import type` for types, `.js` in relative imports.
 - **The tools RPC.** `src/host/tools-rpc.ts` is a copy of a module shared by several plugins. Change only its block between
   the `PLUGIN-SPECIFIC` markers here; change the rest in the shared copy first. Its methods are every known tool in

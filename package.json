@@ -62,7 +62,8 @@
     "vendor": {
       "id": "notion",
       "name": "Notion",
-      "domain": "notion.so"
+      "domain": "notion.so",
+      "mark": true
     }
   },
   "scripts": {
