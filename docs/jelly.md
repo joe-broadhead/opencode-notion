@@ -49,6 +49,16 @@ tools over time, write actions included. A Jelly admin can set such a tool to as
 `src/notion-tools.ts`; `test/unit/jelly.test.ts` checks the list against it, and each declared effect against the plugin's
 own default rules.
 
+Two declared reads are plan-gated, and each carries a `note` that says so. Notion lists `notion_notion-ai-search` only on
+workspace-owned connections an admin selects (and still runs it by name), and `notion_notion-connector-search` only on
+plans with Notion AI and a connected source. A personal sign-in on another plan does not list them, which is normal.
+`test/fixtures/tool-registry.json` records both as plan-gated, with the reason.
+
+`test/unit/live-capture.test.ts` checks the declaration against Notion's own tool list for a signed-in user, captured
+live on 14 November 2026 in `test/fixtures/live-tools.json` (`provenance.json` says how): every tool Notion serves is
+declared, every declared tool is served or recorded as plan-gated with a note, and each `readOnly` is Notion's
+`readOnlyHint`.
+
 ## Skills
 
 Declared: `notion`, `notion-write`. Jelly refuses an install whose skill ids collide with another plugin's or the agent's
@@ -63,6 +73,17 @@ would put workspace content on a dashboard and call Notion unasked.
 ## Signing in
 
 `jelly.signIns` declares one sign-in, `notion`, for Notion's MCP server `notion`, which signs in with OpenCode's MCP OAuth.
+
+**One sign-in per engine; never copy it.** Notion rotates the refresh token on every use, keeps only the current and the
+previous one valid, and revokes the whole grant when a rotated-away token is reused. A credential copied to another
+engine or agent therefore signs the person out: the first refresh in one copy makes the other copy's token stale, and
+its next refresh revokes the grant for both. Each engine signs in on its own. The sign-in also ends after 180 days, and
+after 30 days without a refresh; the card then says Sign in again.
+
+The sign-in declares `relay: {}`: when the browser cannot reach the engine's loopback, Notion's sign-in may come back
+through Jelly's relay. Notion's server registers clients dynamically and accepts a client metadata document
+(`client_id_metadata_document_supported`), so Jelly can set the server's redirect to the relay without a client of the
+plugin's own and without an admin step.
 
 Jelly folds the declared sign-in into this plugin's one card, which shows it as Connected, Not signed in or Sign in again
 (expired or revoked), and starts, renews and signs out of it. An agent's `jelly_connection_request`, or a tool result that
