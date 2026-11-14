@@ -44,7 +44,7 @@ npm run check
 | `host` | `bun test ./test/host`: the plugin inside an embedded OpenCode host, once on each tested release (`@opencode/sdk` 2.2.3, 2.2.4, 2.2.5 and 2.2.6) |
 | `pack` | `bun test ./test/pack`: builds, packs and installs the package, imports both entry points, and loads it in stock OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6 |
 | `forbidden` | `node scripts/check-forbidden.mjs`: scans `src/`, `test/`, `scripts/` and `dist/` for forbidden APIs and machine-local paths |
-| `copies` | `node scripts/check-copies.mjs`: the tools RPC's shared part in `src/host/tools-rpc.ts`, outside its `PLUGIN-SPECIFIC` block, and Jelly's setting rules in `test/support/jelly-settings.ts` match the copies every plugin carries |
+| `copies` | `node scripts/check-copies.mjs`: the tools RPC's shared part in `src/host/tools-rpc.ts`, outside its `PLUGIN-SPECIFIC` block, the declaration test kit in `test/support/jelly-kit.ts`, and Jelly's setting rules in `test/support/jelly-settings.ts` match the copies every plugin carries |
 | `lint:actions` | `actionlint` over the workflows, when it is on PATH; CI runs it as its own job |
 | `whitelist` | Checks `package.json` against the approved package shape, and that `dist/` holds exactly `index.js` and `tui.js` |
 
@@ -267,5 +267,5 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.1" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.2" }] }
 ```

@@ -1,6 +1,6 @@
 {
   "name": "@joe-broadhead/opencode-notion",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Unofficial OpenCode plugin for Notion: search, read and edit your workspace's pages, databases, comments and files through Notion's official MCP server",
   "keywords": [
@@ -99,7 +99,8 @@
         "name": "notion.notion-ai-search",
         "permission": "notion_notion-ai-search",
         "effect": "allow",
-        "readOnly": true
+        "readOnly": true,
+        "note": "Listed only on workspace-owned connections an admin selects; a personal sign-in may not list it."
       },
       {
         "name": "notion.notion-calendar-list-calendar-resources",
@@ -135,7 +136,8 @@
         "name": "notion.notion-connector-search",
         "permission": "notion_notion-connector-search",
         "effect": "allow",
-        "readOnly": true
+        "readOnly": true,
+        "note": "Listed only on plans with Notion AI and a connected source; other plans do not list it."
       },
       {
         "name": "notion.notion-download-attachment",
@@ -580,7 +582,8 @@
       {
         "id": "notion",
         "label": "Notion",
-        "server": "notion"
+        "server": "notion",
+        "relay": {}
       }
     ],
     "contributes": {

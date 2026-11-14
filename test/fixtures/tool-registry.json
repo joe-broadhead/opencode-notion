@@ -1,0 +1,7 @@
+{
+  "own": [],
+  "tools": {
+    "notion-ai-search": { "availability": "plan", "reason": "Notion lists it only on workspace-owned connections an admin selects, and still runs it by name; a personal connection's list leaves it out." },
+    "notion-connector-search": { "availability": "plan", "reason": "Notion lists it only on plans with Notion AI and a connected source." }
+  }
+}

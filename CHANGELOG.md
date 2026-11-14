@@ -2,11 +2,26 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.0.2] - 2026-11-14
+
+### Added
+
+- The shared declaration test kit, `test/support/jelly-kit.ts`, a byte-identical copy of the one every plugin of the
+  family carries, pinned in `scripts/check-copies.mjs`. `test/unit/jelly.test.ts` runs its declaration and
+  `docs/jelly.md` checks.
+- `test/fixtures/live-tools.json`, Notion's tool list for a signed-in user, captured live on 14 November 2026, and a
+  test that fails when the declaration and that list disagree. Notion serves 77 of the 79 declared tools.
+- Jelly's sign-in declares `relay: {}`, so a Jelly sign-in from a browser tab can come back through Jelly's relay:
+  Notion's server registers clients dynamically and accepts a client metadata document.
 
 ### Changed
 
+- Jelly's declaration notes the two plan-gated reads, `notion-ai-search` and `notion-connector-search`, and
+  `test/fixtures/tool-registry.json` records why each may be missing from a list.
+- `docs/jelly.md` says Notion rotates the refresh token on every use, so a sign-in copied to another engine or agent
+  signs the person out: one sign-in per engine.
 - The icon is now Notion's own logo, as notion.com's header draws it, in place of the family's page-with-a-folded-corner mark; `opencode.vendor.mark` is `true`.
+- OpenCode support is unchanged: `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6.
 
 ## [0.0.1] - 2026-11-13
 

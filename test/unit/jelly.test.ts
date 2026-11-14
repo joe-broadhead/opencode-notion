@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import { DISPLAY_NAME, SERVER_NAME } from "../../src/constants.js"
 import { DESTRUCTIVE_TOOLS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
 import { ACCESS, defaultRules, evaluate } from "../../src/permissions.js"
+import { declarationProblems, docProblems } from "../support/jelly-kit.js"
 import { SKILL_NAMES } from "../../src/skills.js"
 import { parseOptions } from "../../src/options.js"
 import { ACCESS_CHOICES, type PluginSetting, settingChoices, settingsProblems, settingValueIssue } from "../support/jelly-settings.js"
@@ -12,7 +13,14 @@ import { ACCESS_CHOICES, type PluginSetting, settingChoices, settingsProblems, s
  * rule, so this plugin's own rules never reach them: Jelly writes each declared "ask" or "deny" as that tool's default.
  */
 
-type Tool = { name: string; permission: string; effect: "allow" | "ask" | "deny"; readOnly: boolean }
+type Tool = { name: string; permission: string; effect: "allow" | "ask" | "deny"; readOnly: boolean; note?: string }
+const ROOT = new URL("../../", import.meta.url)
+/** The two reads Notion lists only on some plans or connections, from test/fixtures/tool-registry.json. */
+const PLAN_GATED = new Set(
+  Object.entries((JSON.parse(readFileSync(new URL("../fixtures/tool-registry.json", import.meta.url), "utf8")) as { tools: Record<string, { availability?: string }> }).tools)
+    .filter(([, entry]) => entry.availability === "plan")
+    .map(([name]) => name),
+)
 const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as {
   files: string[]
   jelly: {
@@ -31,6 +39,12 @@ const { jelly } = pkg
 const byPermission = new Map(jelly.tools.map((tool) => [tool.permission, tool]))
 
 describe("the jelly declaration", () => {
+  test("follows the plugin authors' standard, with the effects the plugin's own default rules give", () => {
+    const rules = [{ action: "*", resource: "*", effect: "allow" as const }, ...defaultRules()]
+    const registered = [...READ_TOOLS, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS].map((tool) => `${SERVER_NAME}_${tool}`)
+    expect(declarationProblems(ROOT, { effectOf: (permission) => evaluate(rules, permission), registered })).toEqual([])
+  })
+
   test("declares every known tool once, every one allowed, and marks the reads read-only", () => {
     for (const tool of READ_TOOLS) expect(byPermission.get(`notion_${tool}`)).toMatchObject({ effect: "allow", readOnly: true })
     for (const tool of [...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS]) expect(byPermission.get(`notion_${tool}`)).toMatchObject({ effect: "allow", readOnly: false })
@@ -47,7 +61,10 @@ describe("the jelly declaration", () => {
     for (const tool of jelly.tools) {
       expect(tool.name).toStartWith(`${SERVER_NAME}.`)
       expect(tool.name.replaceAll(".", "_")).toBe(tool.permission)
-      expect(Object.keys(tool).sort()).toEqual(["effect", "name", "permission", "readOnly"])
+      // A tool Notion lists only on some plans or connections carries a note that says so; no other tool has one.
+      const gated = PLAN_GATED.has(tool.permission.slice(SERVER_NAME.length + 1))
+      expect(Object.keys(tool).sort()).toEqual(gated ? ["effect", "name", "note", "permission", "readOnly"] : ["effect", "name", "permission", "readOnly"])
+      if (gated) expect(tool.note).toMatch(/^Listed only on /)
     }
   })
 
@@ -59,7 +76,7 @@ describe("the jelly declaration", () => {
     expect(jelly.title).toBe(DISPLAY_NAME)
     expect([...jelly.skills].sort()).toEqual(readdirSync(new URL("../../skills", import.meta.url)).sort())
     expect(jelly.skills).toEqual([...SKILL_NAMES])
-    expect(jelly.signIns).toEqual([{ id: SERVER_NAME, label: DISPLAY_NAME, server: SERVER_NAME }])
+    expect(jelly.signIns).toEqual([{ id: SERVER_NAME, label: DISPLAY_NAME, server: SERVER_NAME, relay: {} }])
     expect(jelly.rpc).toEqual([])
     expect(jelly.views).toEqual([])
     // The one setting is the access option, allowed by default, worded as in the family's other plugins.
@@ -102,5 +119,11 @@ describe("the jelly settings declare their choices", () => {
       expect(settingValueIssue(access, value)).not.toBeNull()
       expect(accepts({ access: value })).toBe(false)
     }
+  })
+})
+
+describe("docs/jelly.md", () => {
+  test("follows the plugin authors' standard", () => {
+    expect(docProblems(ROOT)).toEqual([])
   })
 })
