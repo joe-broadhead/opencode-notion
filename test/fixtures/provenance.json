@@ -1,0 +1,27 @@
+{
+  "captures": [
+    {
+      "fixture": "live-tools.json",
+      "evidence": "live-observed",
+      "listedAt": "2026-11-14",
+      "server": "notion",
+      "endpoint": "https://mcp.notion.com/mcp",
+      "source": "scripts/capture-tools.mjs, signed in",
+      "host": "2.2.6",
+      "protocol": "2025-06-18",
+      "count": 77,
+      "annotations": "every tool",
+      "schemas": "recorded",
+      "digest": {
+        "algorithm": "sha256",
+        "of": "canonical JSON of the recorded tools, sorted by name",
+        "value": "4b4bbcbddd82c4ce84c93e7e321f5402fce2ec6a7ed1ce25bb16ac1f22a1e449"
+      }
+    }
+  ],
+  "live": {
+    "fixture": "live-tools.json",
+    "listedAt": "2026-11-14"
+  },
+  "note": "Digests are for drift detection, not a security signature. live names the newest live-observed capture, which the release gate requires to be at most 14 days old."
+}
