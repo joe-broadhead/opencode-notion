@@ -49,13 +49,13 @@ read it rather than guess. Keep calls to a few at a time: every call counts agai
 
 - `notion-query-meeting-notes`, then `notion-fetch`. A recorded meeting is Granola's or Wispr Flow's, and notes the user
   wrote are a Notion page. When the app isn't named, ask which, or say which source you read.
-- `notion-connector-search` searches only the Slack, Drive, GitHub, Jira, mail and calendar sources connected in Notion;
-  `notion-search` covers Notion pages and databases, and neither covers both. Prefer the user's own plugin for a Slack,
+- When listed, `notion-connector-search` searches only the Slack, Drive, GitHub, Jira, mail and calendar sources
+  connected in Notion; `notion-search` covers Notion pages and databases, and neither covers both. Prefer the user's own plugin for a Slack,
   Drive, GitHub, Jira, Linear or Granola question. Use the connector search only when the user asks for Notion's
   connected sources by name, or for both, and then search Notion as well; label a hit as Notion's connector. "Find
   everything about X" with no source named is a question to ask, not a licence to search them all.
-- `notion-fetch` can open a Slack thread or a Drive file through the user's own connection to that source: label it as
-  that source. Prefer `notion-search` and `notion-connector-search`; `notion-ai-search` is the legacy combined search.
+- `notion-fetch` can open a Slack thread or a Drive file through the user's own connection: label it as that source.
+  Prefer `notion-search`, and `notion-connector-search` when listed; `notion-ai-search` is the legacy combined search.
 - Elsewhere: Google Docs, Sheets, Drive, Gmail and Google Calendar are `opencode-gws`; Slack is `slack-search`; GitHub
   is `github`; Linear is `linear`; Jira and Confluence are `jira`; a meeting is `granola` or `wisprflow`, an interview
   is `metaview`, a recording is `opencode-plaud`, the web is `tavily`, and past agent sessions are `history-recall`. A

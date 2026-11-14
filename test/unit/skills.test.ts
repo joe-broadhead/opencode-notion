@@ -173,7 +173,7 @@ describe("skills", () => {
 
   test("notion says the legacy combined search is not called, and every change goes to notion-write", () => {
     const text = flat("notion")
-    expect(text).toContain("Prefer `notion-search` and `notion-connector-search`; `notion-ai-search` is the legacy combined search.")
+    expect(text).toContain("Prefer `notion-search`, and `notion-connector-search` when listed; `notion-ai-search` is the legacy combined search.")
     expect(text).toContain("Load `notion-write` before any create, edit, comment, move, duplicate, database change, file, Notion Calendar event or suggestion decision.")
     // SC-11: history has a call, and restoring an old version is the denied one.
     expect(text).toContain("\"What changed here\" is `notion-get-version-changes`")
