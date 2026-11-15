@@ -12,7 +12,7 @@ Notion is a trademark of Notion Labs, Inc.; this unofficial plugin is not endors
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. Outside that range the plugin does not start, unless
+- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. Outside that range the plugin does not start, unless
   you set `allowUntestedHost`.
 - macOS or Linux, and a browser for the sign-in.
 - A Notion workspace you are a **member** of. Guests cannot connect. Notion MCP works on every plan, Free included.
@@ -498,7 +498,7 @@ Set options with the object form of the plugin entry:
 | Option | Values | Default | Effect |
 | --- | --- | --- | --- |
 | `access` | `"all"`, `"ask-changes"` or `"read-only"` | `"all"` | How much the default rules restrict; see [Permissions](#permissions). |
-| `allowUntestedHost` | `true` or `false` | `false` | Starts on an OpenCode version outside `>=2.2.3 <2.3.0`, with a warning in status. |
+| `allowUntestedHost` | `true` or `false` | `false` | Starts on an OpenCode version outside `>=2.2.3 <2.4.0`, with a warning in status. |
 
 [docs/configuration.md](https://github.com/joe-broadhead/opencode-notion/blob/HEAD/docs/configuration.md) has the details,
 including your own `mcp.servers.notion` entry, the MCP token alternative, permission recipes and every error.
@@ -549,13 +549,13 @@ Run `/notion-status` first. Its last line is the next step.
 | A download link expired | Notion's file URLs last minutes. Ask again. |
 | Rate limited | Wait the `retry_after_seconds` Notion reports, and make fewer calls at once. A Free, Plus or Education workspace allows 180 requests a minute per connection; Business and Enterprise 600. |
 | Agents without default rules | Put the default rules shown by `/notion-status` first in each listed agent's own permissions, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for Notion tools. |
-| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4, 2.2.5 or 2.2.6. Inside `>=2.2.3 <2.3.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If Notion misbehaves, use a tested release. |
+| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 or 2.3.0. Inside `>=2.2.3 <2.4.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If Notion misbehaves, use a tested release. |
 | Signed in to the wrong workspace | Run `opencode mcp logout notion` (or remove the account in `/connect` → Notion), then sign in again. Run it from the project folder where the plugin is installed, or remove the account in `/connect` → **Notion**. If it answers `MCP server not found: notion`, OpenCode is still opening that folder: wait a few seconds and run it again. |
 | A Notion tool is refused in `opencode run` | Nobody could answer its prompt. Add an `allow` rule for that tool to the agent's own `permissions`, or use `access: "all"`. |
 | A skill seems ignored, and status names a skill to rename or move | A skill of yours with the same id, such as `notion`, replaces the plugin's. Rename or move it. |
 | `/notion` is missing | The plugin did not start. Run `/plugins` to see the error. |
 | `OPTIONS_INVALID` | An option is unknown or has a wrong value. The message names the option and the accepted values. |
-| `HOST_UNTESTED` | Your OpenCode is outside `>=2.2.3 <2.3.0`, so the plugin did not start. Use OpenCode `>=2.2.3 <2.3.0`, or set `"allowUntestedHost": true` to run anyway. |
+| `HOST_UNTESTED` | Your OpenCode is outside `>=2.2.3 <2.4.0`, so the plugin did not start. Use OpenCode `>=2.2.3 <2.4.0`, or set `"allowUntestedHost": true` to run anyway. |
 | `STATUS_UNAVAILABLE` | The status could not be read, or the plugin is not running. Follow the next step in the message. |
 | `SKILLS_INVALID` | A skill file in the package is missing or broken. Reinstall the plugin. |
 | `SERVER_NOT_REGISTERED` | The plugin could not register the `notion` server. Restart OpenCode. |
