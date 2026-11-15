@@ -309,11 +309,16 @@ export interface AccountState {
 /** How long after a status change no tools still means "listing". */
 const LISTING_MS = 15_000
 
-/** Reads the live facts through public host APIs; never calls Notion. Optional lookups that fail leave their field empty. */
-export async function readStatus(
-  ctx: StatusContext,
-  facts: Pick<StatusFacts, "source" | "host" | "problems"> & { readonly skills?: readonly SkillPath[]; readonly listing?: ListingState; readonly account?: AccountState; readonly access?: Access },
-) {
+type ReadFacts = Pick<StatusFacts, "source" | "host" | "problems"> & { readonly skills?: readonly SkillPath[]; readonly listing?: ListingState; readonly account?: AccountState; readonly access?: Access }
+
+/**
+ * Reads the live facts through public host APIs; never calls Notion. Optional lookups that fail leave their field empty.
+ *
+ * The facts may be given as a function, called after the lists: OpenCode runs the plugin's MCP and agent
+ * transforms only when something reads that state, and they record the server's source and a failed rule insert.
+ * Listing the servers and agents first runs them, so the facts read afterwards are current, also right after start-up.
+ */
+export async function readStatus(ctx: StatusContext, input: ReadFacts | (() => ReadFacts)) {
   const [servers, agents, tools, listed] = await Promise.all([
     ctx.mcp.list(),
     ctx.agent.list(),
@@ -324,6 +329,7 @@ export async function readStatus(
       () => undefined,
     ),
   ])
+  const facts = typeof input === "function" ? input() : input
   const server = servers.data.find((entry) => entry.name === SERVER_NAME)
   // A server that needs a new sign-in may come back as another workspace. Note whether a workspace was read before, so
   // status can tell a first sign-in from one that worked and was revoked.

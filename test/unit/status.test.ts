@@ -424,3 +424,19 @@ describe("status RPC", () => {
     }
   })
 })
+
+describe("readStatus on a lazy host", () => {
+  test("reads the facts after the lists, which run the plugin's transforms", async () => {
+    // OpenCode runs the MCP transform when its server list is read: until then the plugin has recorded no source.
+    let source: { type: "plugin"; url: string; signIn: "oauth" } | undefined
+    const ctx = {
+      mcp: { list: async () => ((source = { type: "plugin", url: URL, signIn: "oauth" }), { data: [{ name: "notion", status: { status: "connected" }, integrationID: "mcp_fake" }] }) },
+      agent: { list: async () => ({ data: [] }) },
+      tool: { list: async () => [] },
+      skill: { list: async () => ({ data: [] }) },
+    } as unknown as StatusContext
+    const status = await readStatus(ctx, () => ({ ...(source ? { source } : {}), host }))
+    expect(status.state).toBe("connected")
+    expect(status.source).toMatchObject({ type: "plugin" })
+  })
+})
