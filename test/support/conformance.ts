@@ -10,7 +10,7 @@ import { encodeBoundCursor } from "@we-the-rebel-alliance/source-contract/cursor
 import { readInstalledDescriptor, type InstalledDescriptor } from "@we-the-rebel-alliance/source-contract/descriptor"
 import { SOURCES_SCHEMA } from "@we-the-rebel-alliance/source-contract/schema"
 import { METHODS } from "../../src/host/tools-rpc.js"
-import { PACKAGE, SOURCE, eventsMethod, probeMethod } from "../../src/source.js"
+import { PACKAGE, SOURCE, eventsMethod, probeMethod, signIns } from "../../src/source.js"
 import { FIXTURE, ROOT, call, fakeContext, type Fixture } from "./fake-notion.js"
 
 export { ROOT }
@@ -43,10 +43,14 @@ export async function conformanceReports(fixture: Fixture = FIXTURE): Promise<Co
   const sources = declaredSources()
   const account = fixture.self.workspace.id
   const now = Date.parse(fixture.now)
-  const methods = (session: SessionContext) => {
-    const ctx = fakeContext(fixture, async (input) => session.permission.assert(input))
+  // What probe records, for the one sign-in: a listing names its workspace and owner, as the plugin does.
+  const known = signIns()
+  const methods = (session: Pick<SessionContext, "permission">) => {
+    const ctx = fakeContext(fixture, async (input) => session.permission.assert(input), { signIns: known })
     return { events: eventsMethod(ctx, () => now), probe: probeMethod(ctx) }
   }
+  // A consumer probes at bind: the plugin then knows who the sign-in is, and a listing for that workspace runs.
+  await methods({ permission: { assert: async () => {} } }).probe.run({ source: SOURCE }, call())
   const reports: ConformanceReport[] = []
   for (const source of sources.items) {
     reports.push(

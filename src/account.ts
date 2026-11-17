@@ -94,6 +94,8 @@ export async function watchAccount(
   },
   ownSignIn: () => boolean = () => false,
   owned: () => boolean = () => true,
+  /** Called whenever what was read is forgotten: a sign-out or another account. */
+  forgotten: () => void = () => {},
 ) {
   let account: Account | undefined
   // Survives the clear on `needs_auth`: an account that was read before a challenge means the sign-in worked, so a
@@ -114,7 +116,10 @@ export async function watchAccount(
   // Signed out (the server needs a sign-in again) or another account: what was read no longer holds.
   const check = async () => {
     const server = (await ctx.mcp.list()).data.find((item) => item.name === SERVER_NAME)
-    if (server?.status.status !== "connected" && server?.status.status !== "pending") account = undefined
+    if (server?.status.status !== "connected" && server?.status.status !== "pending") {
+      account = undefined
+      forgotten()
+    }
   }
   const watching = (async () => {
     while (!stopped.signal.aborted) {
@@ -124,6 +129,7 @@ export async function watchAccount(
           if (event.type === "credential.switched") {
             account = undefined
             known = false
+            forgotten()
           } else if (event.data.server === SERVER_NAME) {
             changedAt = Date.now()
             await check().catch(() => undefined)

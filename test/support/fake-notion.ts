@@ -3,12 +3,14 @@
 // test/fixtures/conformance.json in Notion's documented shapes. Every workspace, person and page in it is invented.
 //
 // The search keeps to what Notion documents and what a live call showed: `sort: "last_edited"` lists newest first,
-// `filters.last_edited_date_range` takes whole UTC dates (start and end inclusive, each optional), at most `page_size`
+// `filters.last_edited_date_range` takes whole dates (start and end inclusive, each optional) in a time zone Notion does
+// not state, UTC unless a test names another, at most `page_size`
 // results (50 at most) and no next page, and each result has an id, title, URL, type and `timestamp`, its last edit to
 // the minute. On a plan without the Business options, Notion drops the sort and the date filter, runs no search for an
 // empty query, and says so in `notices`.
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { signIns, type SignIns } from "../../src/source.js"
 
 export const ROOT = join(import.meta.dir, "..", "..")
 
@@ -54,12 +56,19 @@ export interface FakeOptions {
   readonly self?: unknown
   /** Every search's input, in order. */
   readonly searches?: Record<string, unknown>[]
+  /** The hours Notion's date filter is from UTC, such as −5 or 5.5; 0 by default. */
+  readonly zone?: number
+  /** What probe recorded per sign-in; a new, empty record by default. */
+  readonly signIns?: SignIns
+  /** The pages, instead of the fixture's; read at each search, so a test can change them between calls. */
+  readonly pages?: () => readonly FakePage[]
 }
 
-const dateOf = (iso: string) => iso.slice(0, 10)
+/** The date of a time in a zone `zone` hours from UTC. */
+const dateIn = (iso: string, zone: number) => new Date(Date.parse(iso) + zone * 3_600_000).toISOString().slice(0, 10)
 
 /** notion-search's answer for an input, over `pages`. */
-export function searchAnswer(pages: readonly FakePage[], input: Record<string, unknown>, plan: "business" | "free" = "business"): Record<string, unknown> {
+export function searchAnswer(pages: readonly FakePage[], input: Record<string, unknown>, plan: "business" | "free" = "business", zone = 0): Record<string, unknown> {
   if (plan === "free") {
     return {
       results: [],
@@ -74,7 +83,7 @@ export function searchAnswer(pages: readonly FakePage[], input: Record<string, u
   const range = filters.last_edited_date_range ?? {}
   const size = Math.min(50, Math.max(1, Number(input["page_size"] ?? 10)))
   const results = pages
-    .filter((page) => (range.start_date === undefined || dateOf(page.edited) >= range.start_date) && (range.end_date === undefined || dateOf(page.edited) <= range.end_date))
+    .filter((page) => (range.start_date === undefined || dateIn(page.edited, zone) >= range.start_date) && (range.end_date === undefined || dateIn(page.edited, zone) <= range.end_date))
     .sort((a, b) => Date.parse(b.edited) - Date.parse(a.edited))
     .slice(0, size)
     .map((page) => ({
@@ -95,12 +104,12 @@ type Assert = (input: { readonly action: string; readonly resources: readonly st
 
 /** The plugin context the source reads through: Notion's two tools, the server's state, and the caller's permission. */
 export function fakeContext(fixture: Fixture, assert: Assert, options: FakeOptions = {}) {
-  const pages = pagesOf(fixture)
+  const pages = options.pages ?? (() => pagesOf(fixture))
   const answers: Record<string, (input: Record<string, unknown>) => unknown> = {
     "notion-get-self": () => options.self ?? fixture.self,
     "notion-search": (input) => {
       options.searches?.push(input)
-      return searchAnswer(pages, input, options.plan)
+      return searchAnswer(pages(), input, options.plan, options.zone)
     },
   }
   const status = options.status ?? "connected"
@@ -117,6 +126,8 @@ export function fakeContext(fixture: Fixture, assert: Assert, options: FakeOptio
     tool: { list: async () => (status === "connected" ? tools : []) as never },
     mcp: { list: async () => ({ data: [{ name: "notion", status: { status } }] }) as never },
     permission: { assert: async (input: { action: string; resources: readonly string[] }) => assert({ action: input.action, resources: [...input.resources] }) },
+    signIn: async () => "crd_conformance",
+    signIns: options.signIns ?? signIns(),
   }
 }
 

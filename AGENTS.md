@@ -70,9 +70,10 @@ for the checks and the release steps.
   is the kit's check, copied verbatim, and is the one definition of a safe icon: it runs in the `icons` stage of
   `npm run check`.
 - **The pages source.** `src/source.ts` is `notion.pages`, declared in `package.json`'s top-level `sources`: `events_list`
-  and `probe`, tools RPC methods only, read through OpenCode's executors for `notion-get-self` and `notion-search` and
-  nothing else, and never page content. `permission.operations` is exactly the tools they read, `notion-get-self` is the
-  identity operation, and `npm run conformance` (the `conformance` stage) runs the source contract's kit over the fake in
+  and `probe`, tools RPC methods only, read through OpenCode's executors for `notion-get-self` (probe only) and
+  `notion-search` (events_list only) and nothing else, and never page content. `events_list` never reads who is signed
+  in: it lists for what probe recorded for the sign-in. `permission.operations` is exactly the tools they read,
+  `notion-get-self` is the identity operation, the descriptor carries no key a contract 0.1 consumer refuses, and `npm run conformance` (the `conformance` stage) runs the source contract's kit over the fake in
   `test/support/fake-notion.ts`, writing `reports/conformance-report.json`; its report must be ok. The source's codes are
   the contract's (`SourceError`), not `CODES`.
 - **TypeScript.** No enums, namespaces or parameter properties. `import type` for types, `.js` in relative imports.

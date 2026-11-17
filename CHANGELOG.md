@@ -8,9 +8,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - A source of the source contract, `notion.pages`, declared in `package.json`'s `sources`: `events_list` lists the
   workspace's pages and databases by the time they were last edited, as events with their title, edit time and link and
-  no page content, and `probe` names the workspace and the signed-in user. Both are tools RPC methods, read only
-  `notion-get-self` and `notion-search`, and are allowed by the default rules under every `access` value. Listing by
-  last edit needs a Business or Enterprise workspace.
+  no page content, and `probe` names the workspace and the signed-in user and records them for the sign-in, which
+  `events_list` then lists for. Both are tools RPC methods, read only `notion-get-self` (probe) and `notion-search`
+  (events_list), and are allowed by the default rules under every `access` value. Listing by last edit needs a Business
+  or Enterprise workspace.
 - `npm run conformance` and the `conformance` stage of `npm run check`: the source contract's conformance kit over the
   source, against a fake Notion, writing `reports/conformance-report.json` for the release to attach.
 

@@ -157,22 +157,29 @@ tools RPC's own `notion-get-self` result. It changes no result.
 only and never tools:
 
 - `probe` asserts `notion_probe`, then reads `notion-get-self`: the account is the workspace's id, and the owner is the
-  signed-in user, `notion:` and their id, labelled with their name.
-- `events_list` asserts `notion_events_list`, reads `notion-get-self` too (no search result names the workspace, so this
-  is how a page names its owner and how a switch to another workspace is refused), then `notion-search` with an empty
-  query, `sort: "last_edited"` and `filters.last_edited_date_range`. Notion runs that sort and that filter only for
-  Business and Enterprise workspaces; on another plan it drops them with a notice, and the source refuses with
-  `UNAVAILABLE` rather than list pages in another order. The descriptor therefore declares `permission.readsIdentity`.
+  signed-in user, `notion:` and their id, labelled with their name. It records them for the sign-in, OpenCode's credential
+  for the server; `watchAccount` clears the record on `credential.switched` or a status that is not connected.
+- `events_list` asserts `notion_events_list` and reads only `notion-search`, with an empty query, `sort: "last_edited"`
+  and `filters.last_edited_date_range`. It never reads who is signed in: it names the workspace and owner probe recorded
+  for the sign-in, and refuses with `UNAVAILABLE` ("call probe") until there is one. Notion runs that sort and that filter
+  only for Business and Enterprise workspaces; on another plan it drops them with a notice, and the source refuses with
+  `UNAVAILABLE` rather than list pages in another order. The descriptor has no consent note, so the methods'
+  descriptions and the README say so.
 
 Each result gives a page's id, title, URL, type and `timestamp`, its last edit to the minute; no tool names the editor,
 so `actors` is empty, and no content is read, so `text` is empty. One event is one page at one edit time (`external_id`
-is the page's id, `@` and that time; `thread` is the page's id). Search answers at most 50 results, newest first, with no
-next page, and its date filter takes whole days, so a call walks back from the newest edits, each search ending on the day
-of the previous one's oldest result (widened by 14 hours for any time zone), until one reaches past the cursor. When 50
-edits within about a day stop the walk, or it has made ten searches, the page answers `gap: { reason: "window-truncated" }`
-once and the cursor moves past what it could not read. An edit is listed once its minute ended ten minutes ago. The cursor
-is the source contract's, bound to the plugin, the source and the workspace, and holds the last (time, page id) listed;
-it never expires.
+is the page's id, `@` and that time; `thread` is the page's id).
+
+Search answers at most 50 results, newest first, with no next page, and its date filter takes whole days in a zone it
+does not state. `walk` steps back from the newest edits: each search is complete above its oldest result, and the next
+asks for edits on or before that result's own day, found by trying dates from the earliest the time can fall on (UTC−12)
+until one answers an edit at or after it; what each answer shows narrows the zone for the next guess. When 50 edits at or
+after that time fill their day's answer, the earlier edits of that day are a hole, and the walk goes on with the day
+before; whatever 30 searches do not reach is a hole too. A page lists the edits from its cursor up to the first hole; when
+the cursor sits right before a hole, it says `gap: { reason: "window-truncated" }` from where the hole starts and lists the
+edits after it, so each hole is answered once. An edit is listed once its minute ended ten minutes ago. The cursor is the
+source contract's, bound to the plugin, the source and the workspace, and holds the last (time, page id) listed; it never
+expires.
 
 `npm run conformance` runs the source contract's conformance kit over these methods against the fake Notion in
 `test/support/fake-notion.ts` and writes `reports/conformance-report.json`, which a release attaches.

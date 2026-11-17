@@ -8,7 +8,7 @@ import { resultProblems, SourceError, type EventsListResult } from "@we-the-rebe
 import { pluginError } from "../../src/host/tools-rpc.js"
 import { PLUGIN_METHODS } from "../../src/notion-tools.js"
 import { defaultRules, type Access } from "../../src/permissions.js"
-import { EVENTS_ACTION, MAX_SEARCHES, PROBE_ACTION, SEARCH_PAGE, SOURCE, SOURCE_ID, URL_HOSTS, eventsMethod, identityOf, notionUrl, probeMethod, readSearch } from "../../src/source.js"
+import { EVENTS_ACTION, MAX_SEARCHES, PROBE_ACTION, SEARCH_PAGE, SOURCE, SOURCE_ID, URL_HOSTS, eventsMethod, identityOf, notionUrl, probeMethod, readSearch, signIns } from "../../src/source.js"
 import { conformanceReports, declaredSources } from "../support/conformance.js"
 import { FIXTURE, ROOT, call, fakeContext, pagesOf, type FakeOptions, type Fixture } from "../support/fake-notion.js"
 
@@ -22,10 +22,13 @@ interface Harness {
   probe(input: Record<string, unknown>): Promise<unknown>
 }
 
-function harness(options: FakeOptions = {}, fixture: Fixture = FIXTURE): Harness {
+/** The fake, with what probe recorded for its sign-in unless `probed` is false. */
+function harness(options: FakeOptions = {}, fixture: Fixture = FIXTURE, probed = true): Harness {
   const asserted: string[] = []
   const searches: Record<string, unknown>[] = []
-  const ctx = fakeContext(fixture, async (input) => void asserted.push(input.action), { ...options, searches })
+  const known = options.signIns ?? signIns()
+  if (probed) known.set("crd_conformance", identityOf(fixture.self)!)
+  const ctx = fakeContext(fixture, async (input) => void asserted.push(input.action), { ...options, searches, signIns: known })
   return {
     asserted,
     searches,
@@ -85,10 +88,30 @@ describe("events_list", () => {
     expect(page.gap).toBeUndefined()
   })
 
-  test("asserts its own action, then notion-get-self and notion-search, and nothing else", async () => {
+  test("asserts its own action, then notion-search, and never reads who is signed in", async () => {
     const h = harness()
     await h.list({ since: "2026-11-15T00:00:00Z" })
-    expect(h.asserted).toEqual([EVENTS_ACTION, "notion_notion-get-self", "notion_notion-search"])
+    expect(h.asserted).toEqual([EVENTS_ACTION, "notion_notion-search"])
+  })
+
+  test("before a probe has named this sign-in, refuses with UNAVAILABLE and asks for a probe, before any search", async () => {
+    const h = harness({}, FIXTURE, false)
+    const failure = await refusal(h.list({ since: "2026-11-15T00:00:00Z" }))
+    expect(failure).toEqual({
+      code: "UNAVAILABLE",
+      what: "The plugin does not know yet who is signed in to Notion: no probe has named this sign-in's workspace since it was made or OpenCode started",
+      next: "Call probe for the pages source, then call events_list again.",
+    })
+    expect(h.searches).toEqual([])
+    // A probe records the sign-in, and the listing then runs.
+    await h.probe({})
+    expect((await h.list({ since: "2026-11-15T00:00:00Z" })).account).toBe(ACCOUNT)
+  })
+
+  test("a probe for another sign-in does not stand for this one", async () => {
+    const known = signIns()
+    known.set("crd_other", identityOf(FIXTURE.self)!)
+    expect((await refusal(harness({ signIns: known }, FIXTURE, false).list({}))).code).toBe("UNAVAILABLE")
   })
 
   test("searches every edit since the cursor, sorted by last edit, with no highlight, from the earliest local date", async () => {
@@ -141,19 +164,19 @@ describe("events_list", () => {
     expect(pages[0]!.more).toBe(true)
     for (const page of pages.slice(1)) expect(page.gap).toBeUndefined()
     const titles = pages.flatMap((page) => page.events.map((event) => event.title))
-    // The first eleven of the sixty could not be seen past the newer fifty; every later edit is listed once.
-    expect(titles.slice(0, 2)).toEqual(["Import batch 12", "Import batch 13"])
-    expect(titles.filter((title) => title.startsWith("Import batch"))).toHaveLength(49)
+    // The first ten of the sixty could not be seen past the newer fifty on their day; every later edit is listed once.
+    expect(titles.slice(0, 2)).toEqual(["Import batch 11", "Import batch 12"])
+    expect(titles.filter((title) => title.startsWith("Import batch"))).toHaveLength(50)
     expect(new Set(titles).size).toBe(titles.length)
     expect(titles.at(-1)).toBe("Hiring plan")
   })
 
   test("a long backlog the walk cannot finish within its searches is a gap, never a skipped edit it saw", async () => {
-    // One edit an hour for 40 days: every search can step back only about a day.
+    // An edit every half hour for 40 days: every search can step back only about a day.
     const start = Date.parse("2026-10-01T00:00:00Z")
     const fixture: Fixture = {
       ...FIXTURE,
-      pages: Array.from({ length: 40 * 24 }, (_, index) => ({ id: `3c4d5e6f-0000-4000-8000-${String(index).padStart(12, "0")}`, type: "page" as const, title: `Hourly ${index}`, edited: new Date(start + index * 3_600_000).toISOString() })),
+      pages: Array.from({ length: 40 * 48 }, (_, index) => ({ id: `3c4d5e6f-0000-4000-8000-${String(index).padStart(12, "0")}`, type: "page" as const, title: `Half-hourly ${index}`, edited: new Date(start + index * 1_800_000).toISOString() })),
       dense: { ...FIXTURE.dense, count: 0 },
     }
     const h = harness({}, fixture)
@@ -162,8 +185,8 @@ describe("events_list", () => {
     expect(page.gap).toEqual({ reason: "window-truncated", since: "2026-10-01T00:00:00.000Z" })
     const times = page.events.map((event) => Date.parse(event.occurred_at))
     expect(times).toEqual([...times].sort((a, b) => a - b))
-    // Everything after the oldest edit it listed, up to the settled end, is there, hour by hour.
-    for (let index = 1; index < times.length; index++) expect(times[index]! - times[index - 1]!).toBe(3_600_000)
+    // Everything after the oldest edit it listed, up to the settled end, is there, half hour by half hour.
+    for (let index = 1; index < times.length; index++) expect(times[index]! - times[index - 1]!).toBe(1_800_000)
   })
 
   test("a cursor never expires: an old one reads on from where it stopped", async () => {
@@ -219,9 +242,11 @@ describe("events_list", () => {
 
   test("a permission refusal passes through unchanged, for the tools RPC to report", async () => {
     const denied = Object.assign(new Error("Permission denied: notion_notion-search"), { _tag: "Tool.Error", error: new Error("denied") })
+    const known = signIns()
+    known.set("crd_conformance", identityOf(FIXTURE.self)!)
     const ctx = fakeContext(FIXTURE, async (input) => {
       if (input.action === "notion_notion-search") throw denied
-    })
+    }, { signIns: known })
     expect(await eventsMethod(ctx, () => NOW).run({}, call()).catch((error: unknown) => error)).toBe(denied)
   })
 
@@ -293,11 +318,13 @@ describe("the pages source's declaration", () => {
       tool: "events_list",
       input: { source: SOURCE },
       accounts: { named: false },
-      permission: { events: EVENTS_ACTION, operations: ["notion-get-self", "notion-search"], identity: ["notion-get-self"], readsIdentity: true },
+      permission: { events: EVENTS_ACTION, operations: ["notion-get-self", "notion-search"], identity: ["notion-get-self"] },
       private: true,
       cost: { class: "free" },
       maxBytes: 65_536,
     })
+    // No key a consumer on contract 0.1 refuses.
+    expect("readsIdentity" in item!.permission).toBe(false)
     expect(sources.items).toHaveLength(1)
   })
 

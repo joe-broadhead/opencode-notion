@@ -125,7 +125,8 @@ write that returned 503 before reading the object.
 Two more methods are the plugin's own, not Notion's tools: `probe` and `events_list`, the source contract's methods for
 the `notion.pages` source, which the README's "The pages source" describes. They take the source contract's inputs and
 answer its pages: `probe` takes nothing, or `{"source":"pages","account":"<workspace id>"}`, and `events_list` takes
-`cursor` or `since`, and `limit`, `account` and `source`. Their refusals carry the source contract's codes, such as
+`cursor` or `since`, and `limit`, `account` and `source`. Call `probe` first, once per sign-in and after OpenCode
+starts: `events_list` lists for the workspace a probe named, and answers `UNAVAILABLE` until one has. Their refusals carry the source contract's codes, such as
 `INPUT_INVALID`, `ACCOUNT_MISMATCH`, `CURSOR_INVALID`, `NEEDS_SIGN_IN`, `RATE_LIMITED` (with how long to wait) and
 `UNAVAILABLE`, in the same `CODE: what happened. Next step: what to do.` form as the codes below.
 

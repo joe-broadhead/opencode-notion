@@ -93,8 +93,7 @@
           ],
           "identity": [
             "notion-get-self"
-          ],
-          "readsIdentity": true
+          ]
         },
         "private": true,
         "cost": {
