@@ -120,6 +120,19 @@ answers 429 or 529 with that body, and retries a rate limit once itself when the
 A 503 (`service_overload`) on a write can mean the write was saved. Read the object before repeating it: never retry a
 write that returned 503 before reading the object.
 
+## The pages source
+
+Two more methods are the plugin's own, not Notion's tools: `probe` and `events_list`, the source contract's methods for
+the `notion.pages` source, which the README's "The pages source" describes. They take the source contract's inputs and
+answer its pages: `probe` takes nothing, or `{"source":"pages","account":"<workspace id>"}`, and `events_list` takes
+`cursor` or `since`, and `limit`, `account` and `source`. Their refusals carry the source contract's codes, such as
+`INPUT_INVALID`, `ACCOUNT_MISMATCH`, `CURSOR_INVALID`, `NEEDS_SIGN_IN`, `RATE_LIMITED` (with how long to wait) and
+`UNAVAILABLE`, in the same `CODE: what happened. Next step: what to do.` form as the codes below.
+
+```sh
+opencode api post /api/rpc/notion.workspace.tools/probe -H "x-opencode-directory:$PWD" -d '{"input":{"sessionID":"ses_…","input":{}}}'
+```
+
 ## Errors
 
 A refusal or failure is the RPC error `failed`, with a message `CODE: what happened. Next step: what to do.` and

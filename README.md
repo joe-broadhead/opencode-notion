@@ -115,6 +115,41 @@ opencode api post /api/rpc/notion.workspace.tools/notion-search \
 
 See [Scripting](https://github.com/joe-broadhead/opencode-notion/blob/HEAD/docs/scripting.md).
 
+### The pages source
+
+The plugin is also a source of the [source contract](https://github.com/we-the-rebel-alliance/source-contract):
+`package.json` declares `notion.pages`, which Memory and other consumers read through the same tools RPC, with two methods
+that are never tools the model sees.
+
+- `probe` reads `notion-get-self` and answers who is signed in: the account is the workspace's id, and the owner is the
+  signed-in user, `notion:` and their id, labelled with their name.
+- `events_list` lists the workspace's pages and databases by the time they were last edited, oldest first, from a cursor
+  or a `since`. One event is one page at one edit time: its title, the edit time to the minute, a link to the page, and
+  `page` or `database`. It reads `notion-get-self`, then `notion-search` with an empty query sorted by last edit.
+
+```sh
+opencode api post /api/rpc/notion.workspace.tools/events_list \
+  -H "x-opencode-directory:$PWD" \
+  -d '{"input":{"sessionID":"ses_…","input":{"since":"2026-11-16"}}}'
+```
+
+What the source can and cannot say comes from what Notion's search gives:
+
+- **Business or Enterprise only.** Notion sorts and filters search by last edit only for those plans. On any other plan it
+  drops the sort, and `events_list` refuses with `UNAVAILABLE` rather than list pages in another order.
+- **No page content and no editor.** An event's `text` is empty, and its `actors` are empty, because search names no
+  editor. Read a page with `notion-fetch` when you need it; a title is someone's writing and untrusted. A title that holds
+  a secret is refused (`refused[]`), never listed.
+- **The latest edit of each page.** Search lists only a page's last edit, so edits made between two reads of a page are
+  one event, at the last time. An edit is listed once its minute ended ten minutes ago.
+- **At most 50 at a time.** Search answers 50 results and no next page, so a read walks back from the newest edits. When
+  more than 50 edits fall within about a day, or the walk takes ten searches, the page says
+  `gap: { "reason": "window-truncated" }` once and the read goes on past the edits it could not see.
+
+The cursor never expires. Its codes are the source contract's, such as `ACCOUNT_MISMATCH` for another workspace,
+`CURSOR_INVALID` and `RATE_LIMITED`. `npm run conformance` runs the contract's conformance kit over the source, and each
+release attaches its report.
+
 ## Permissions
 
 **Every tool is allowed by default.** The plugin adds one block to every agent, right after the agent's base rule that
@@ -229,7 +264,9 @@ The plugin adds these rules for `access: "all"`:
     { "action": "notion_notion-send-message-to-session", "resource": "*", "effect": "allow" },
     { "action": "notion_notion-spawn-session", "resource": "*", "effect": "allow" },
     { "action": "notion_notion-stop-session", "resource": "*", "effect": "allow" },
-    { "action": "notion_notion-upload-skill", "resource": "*", "effect": "allow" }
+    { "action": "notion_notion-upload-skill", "resource": "*", "effect": "allow" },
+    { "action": "notion_events_list", "resource": "*", "effect": "allow" },
+    { "action": "notion_probe", "resource": "*", "effect": "allow" }
 ]
 ```
 
@@ -318,7 +355,9 @@ The plugin adds these rules for `access: "ask-changes"`:
     { "action": "notion_notion-send-message-to-session", "resource": "*", "effect": "ask" },
     { "action": "notion_notion-spawn-session", "resource": "*", "effect": "ask" },
     { "action": "notion_notion-stop-session", "resource": "*", "effect": "ask" },
-    { "action": "notion_notion-upload-skill", "resource": "*", "effect": "ask" }
+    { "action": "notion_notion-upload-skill", "resource": "*", "effect": "ask" },
+    { "action": "notion_events_list", "resource": "*", "effect": "allow" },
+    { "action": "notion_probe", "resource": "*", "effect": "allow" }
 ]
 ```
 
@@ -407,7 +446,9 @@ The plugin adds these rules for `access: "read-only"`:
     { "action": "notion_notion-send-message-to-session", "resource": "*", "effect": "deny" },
     { "action": "notion_notion-spawn-session", "resource": "*", "effect": "deny" },
     { "action": "notion_notion-stop-session", "resource": "*", "effect": "deny" },
-    { "action": "notion_notion-upload-skill", "resource": "*", "effect": "deny" }
+    { "action": "notion_notion-upload-skill", "resource": "*", "effect": "deny" },
+    { "action": "notion_events_list", "resource": "*", "effect": "allow" },
+    { "action": "notion_probe", "resource": "*", "effect": "allow" }
 ]
 ```
 

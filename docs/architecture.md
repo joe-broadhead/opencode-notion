@@ -2,8 +2,10 @@
 
 The plugin is a thin layer over Notion's official MCP server. OpenCode owns the MCP transport, OAuth, credentials,
 permission prompts and tool output limits. The plugin registers the server, names its `/connect` entry, adds default
-permission rules, reports status, ships two skills, and lets scripts call the known reads through a tools RPC. It adds no
-tool of its own, makes no Notion call of its own, and has no runtime dependencies.
+permission rules, reports status, ships two skills, and lets scripts call the known reads through a tools RPC. It also
+offers one source of the source contract, `notion.pages`, to consumers that call it through the tools RPC. It adds no tool
+of its own, makes no Notion call except the pages source's reads when a consumer asks, and has no runtime dependencies:
+the source contract package it uses is bundled into `dist/index.js`.
 
 ## Layout
 
@@ -20,7 +22,8 @@ tool of its own, makes no Notion call of its own, and has no runtime dependencie
 | `src/status.ts` | The status model and text, `/notion-status`, and the status RPC method |
 | `src/redact.ts` | Redaction for everything status shows: URL credentials, queries and token shapes removed, one line, controls and bidi characters stripped, cut by whole characters |
 | `src/skills.ts` | Loading and registering the skills |
-| `src/host/tools-rpc.ts` | The tools RPC for scripts, `notion.workspace.tools`; a copy of a module shared by several plugins, with Notion's part in one marked block |
+| `src/host/tools-rpc.ts` | Notion's part of the tools RPC for scripts, `notion.workspace.tools`: the plugin value and the method table that the source contract's `tools-rpc` module takes |
+| `src/source.ts` | The pages source, `notion.pages`: `events_list` and `probe`, the source contract's methods, over `notion-get-self` and `notion-search` |
 | `src/tui.ts` | The terminal UI part: the plugin `notion.workspace.tui` and the `/notion` dialog |
 | `src/constants.ts` | IDs, the server name and URL, the one OAuth scope, the Code Mode namespace description, the supported host range, the tested releases (`TESTED_HOSTS`, the one list the checks and status use) and the error shape. No imports, so `scripts/check.mjs` can load it |
 | `src/version.ts` | The plugin's version from `package.json`; the build replaces it with the version string alone |
@@ -57,7 +60,8 @@ kit adds (`./icon.svg`, `./icon-128.png`, `./icon-256.png`), and ships no declar
 7. `watchAccount` registers one `execute.after` hook for `notion_notion-get-self` results, keeps the workspace name
    and connection type in memory, and notes when the server's status last changes.
 8. `ctx.skill.transform`, `ctx.command.transform` (`/notion-status`) and `ctx.rpc.register` (`notion.workspace/status`).
-9. `registerToolsRpc` registers the tools RPC, `notion.workspace.tools`, and its `evaluate` hook.
+9. `registerToolsRpc`, the source contract's, registers the tools RPC, `notion.workspace.tools`, with the known tools and
+   the pages source's `events_list` and `probe`, and its `evaluate` hook.
 10. `watchIntegration` starts. Setup returns one cleanup that stops it, disposes the tools RPC and stops the account
     watcher.
 
@@ -131,7 +135,8 @@ A call is `{ sessionID, input }`. The module:
 
 While a call runs, its id is live. A `permission.hook("evaluate")` turns an `ask` whose source id is live into a deny, so
 the script gets `PERMISSION_DENIED` at once and no prompt waits. It changes nothing else; this is the plugin's only
-permission hook, and the forbidden scan allows exactly this one.
+permission hook, it comes from the source contract's `tools-rpc` module, and the forbidden scan allows exactly this one in
+the bundle and none in the plugin's own source.
 
 A `Tool.Error` with a cause is a permission refusal; one without a cause is Notion's own error (`isError`), which becomes
 `UPSTREAM_ERROR` with its first line, at most 300 characters, with tokens and URL queries removed. Any other failure is
@@ -144,6 +149,33 @@ envelope with `rpc.invalid_input`.
 
 The executor does not run `execute.before` and `execute.after` hooks, so `shapeResult` applies the account capture for the
 tools RPC's own `notion-get-self` result. It changes no result.
+
+## The pages source
+
+`package.json`'s top-level `sources` declares one source of the source contract, `notion.pages` (kind `events`, reads
+`doc`), on the tools RPC `notion.workspace.tools`. `src/source.ts` implements its two methods, which are tools RPC methods
+only and never tools:
+
+- `probe` asserts `notion_probe`, then reads `notion-get-self`: the account is the workspace's id, and the owner is the
+  signed-in user, `notion:` and their id, labelled with their name.
+- `events_list` asserts `notion_events_list`, reads `notion-get-self` too (no search result names the workspace, so this
+  is how a page names its owner and how a switch to another workspace is refused), then `notion-search` with an empty
+  query, `sort: "last_edited"` and `filters.last_edited_date_range`. Notion runs that sort and that filter only for
+  Business and Enterprise workspaces; on another plan it drops them with a notice, and the source refuses with
+  `UNAVAILABLE` rather than list pages in another order. The descriptor therefore declares `permission.readsIdentity`.
+
+Each result gives a page's id, title, URL, type and `timestamp`, its last edit to the minute; no tool names the editor,
+so `actors` is empty, and no content is read, so `text` is empty. One event is one page at one edit time (`external_id`
+is the page's id, `@` and that time; `thread` is the page's id). Search answers at most 50 results, newest first, with no
+next page, and its date filter takes whole days, so a call walks back from the newest edits, each search ending on the day
+of the previous one's oldest result (widened by 14 hours for any time zone), until one reaches past the cursor. When 50
+edits within about a day stop the walk, or it has made ten searches, the page answers `gap: { reason: "window-truncated" }`
+once and the cursor moves past what it could not read. An edit is listed once its minute ended ten minutes ago. The cursor
+is the source contract's, bound to the plugin, the source and the workspace, and holds the last (time, page id) listed;
+it never expires.
+
+`npm run conformance` runs the source contract's conformance kit over these methods against the fake Notion in
+`test/support/fake-notion.ts` and writes `reports/conformance-report.json`, which a release attaches.
 
 ## Terminal UI part
 

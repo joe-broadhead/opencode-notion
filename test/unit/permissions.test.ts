@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { DESTRUCTIVE_TOOLS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
+import { DESTRUCTIVE_TOOLS, PLUGIN_METHODS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
 import { ACCESS, defaultRules, effectOf, evaluate, hasDefaultRules, insertRules, registerDefaultRules, unguardedAgents, type Rule } from "../../src/permissions.js"
 import { agentEditor, allow, builtInAgents, transforms, type AgentEditor, type FakeAgent } from "./fake.js"
 
@@ -15,7 +15,7 @@ describe("defaultRules", () => {
   test("allow everything by default: the namespace pattern, then every tool, reads and changes alike", () => {
     const rules = defaultRules("all")
     expect(rules[0]).toEqual(allowAll("notion_*"))
-    expect(rules.slice(1)).toEqual([...READ_TOOLS, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS].map((tool) => allowAll(`notion_${tool}`)))
+    expect(rules.slice(1)).toEqual([...READ_TOOLS, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS, ...PLUGIN_METHODS].map((tool) => allowAll(`notion_${tool}`)))
     expect(effects([allowAll("*"), ...rules])).toEqual(ACTIONS.map(() => "allow"))
   })
 

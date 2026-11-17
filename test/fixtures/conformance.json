@@ -1,0 +1,17 @@
+{
+  "now": "2026-11-16T12:00:00.000Z",
+  "self": {
+    "workspace": { "id": "0f5c2b1e-7a44-4c1e-9d2a-3b6e8f0a1c01", "name": "Northwind Studio" },
+    "user": { "type": "person", "id": "5e1d9a2c-3f4b-4a6d-8c7e-1b2a3c4d5e01", "name": "Avery Example", "email": "avery@example.com" }
+  },
+  "otherWorkspace": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c01",
+  "pages": [
+    { "id": "1a2b3c4d-0000-4000-8000-000000000001", "type": "page", "title": "Q4 planning", "edited": "2026-11-15T09:12:00.000Z" },
+    { "id": "1a2b3c4d-0000-4000-8000-000000000002", "type": "database", "title": "Launch tracker", "edited": "2026-11-15T10:05:00.000Z" },
+    { "id": "1a2b3c4d-0000-4000-8000-000000000003", "type": "page", "title": "Deploy notes ghp_Abcdefghijklmnopqrstuvwxyz0123456789", "edited": "2026-11-15T11:40:00.000Z" },
+    { "id": "1a2b3c4d-0000-4000-8000-000000000004", "type": "page", "title": "Weekly sync", "edited": "2026-11-15T16:30:00.000Z" },
+    { "id": "1a2b3c4d-0000-4000-8000-000000000005", "type": "page", "title": "Hiring plan", "edited": "2026-11-16T08:00:00.000Z" },
+    { "id": "1a2b3c4d-0000-4000-8000-000000000006", "type": "page", "title": "Draft still being edited", "edited": "2026-11-16T11:55:00.000Z" }
+  ],
+  "dense": { "start": "2026-11-10T09:00:00.000Z", "count": 60, "title": "Import batch" }
+}

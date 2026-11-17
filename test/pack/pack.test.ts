@@ -18,10 +18,10 @@ import { basename, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { ENDPOINT, SUPPORTED_HOST, TESTED_HOSTS } from "../../src/constants.js"
 import { TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
-import { DESTRUCTIVE_TOOLS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
+import { DESTRUCTIVE_TOOLS, PLUGIN_METHODS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
 import { defaultRules, type Rule } from "../../src/permissions.js"
 import { SKILL_NAMES } from "../../src/skills.js"
-import { CHALLENGE_SCOPE, CLIENT_URL, NEW_TOOL, startFakeMcp, UPSTREAM_FAILURE, type FakeMcp } from "../host/fake-mcp.js"
+import { CHALLENGE_SCOPE, CLIENT_URL, NEW_TOOL, SELF, startFakeMcp, UPSTREAM_FAILURE, type FakeMcp } from "../host/fake-mcp.js"
 
 const root = fileURLToPath(new URL("../..", import.meta.url))
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
@@ -326,12 +326,22 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     expect(fake.calls.slice(from)).toEqual([])
   })
 
-  test("describes every known tool with its class, each available with its live schema", async () => {
+  test("describes every known tool with its class, each available with its live schema, then the pages source's two reads", async () => {
     const { value } = await script("describe", {})
     expect(value.id).toBe(TOOLS_RPC_ID)
     expect(value.locationHint).toContain("x-opencode-directory")
-    expect(value.methods.map((method: { name: string }) => method.name)).toEqual([...READ_TOOLS, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS])
-    for (const method of value.methods) {
+    expect(value.methods.map((method: { name: string }) => method.name)).toEqual([...READ_TOOLS, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS, ...PLUGIN_METHODS])
+    const own = value.methods.filter((method: { name: string }) => PLUGIN_METHODS.includes(method.name))
+    for (const method of own) {
+      expect({ name: method.name, kind: method.kind, class: method.class, action: method.action, available: method.available }).toEqual({
+        name: method.name,
+        kind: "plugin",
+        class: "read",
+        action: `notion_${method.name}`,
+        available: true,
+      })
+    }
+    for (const method of value.methods.filter((method: { name: string }) => !PLUGIN_METHODS.includes(method.name))) {
       expect({ name: method.name, kind: method.kind, action: method.action, available: method.available }).toEqual({
         name: method.name,
         kind: "mcp",
@@ -346,8 +356,26 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
   test("with a session, describe reports every method's permission as allow, and the unknown tool as unclassified", async () => {
     const { value } = await script("describe", { sessionID: sessions.build })
     const permission = Object.fromEntries(value.methods.map((method: { name: string; permission: string }) => [method.name, method.permission]))
-    for (const name of [...READ_TOOLS, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS]) expect({ name, permission: permission[name] }).toEqual({ name, permission: "allow" })
+    for (const name of [...READ_TOOLS, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS, ...PLUGIN_METHODS]) expect({ name, permission: permission[name] }).toEqual({ name, permission: "allow" })
     expect(value.unclassified).toEqual([NEW_TOOL.name])
+  })
+
+  test("probe names the workspace and the signed-in user from one notion-get-self read, as the session's agent", async () => {
+    const from = fake.calls.length
+    const { value } = await call("build", "probe", {})
+    expect(value).toEqual({ source: "pages", account: SELF.workspace.id, owner: { id: `notion:${SELF.user.id}`, label: SELF.user.name }, trust: "untrusted" })
+    expect(toolCalls(from)).toEqual(["notion-get-self"])
+  })
+
+  test("events_list reads through OpenCode's executors, and refuses a search answer it cannot read with the contract's code", async () => {
+    const from = fake.calls.length
+    const result = await call("build", "events_list", {})
+    expect({ code: result.code, message: result.message }).toEqual({ code: "UNAVAILABLE", message: expect.stringContaining("notion-search answered no results list") })
+    expect(toolCalls(from)).toEqual(["notion-get-self", "notion-search"])
+    // A session whose agent denies Notion is refused before Notion is called.
+    const locked = fake.calls.length
+    expect((await call("locked", "events_list", {})).code).toBe("PERMISSION_DENIED")
+    expect(toolCalls(locked)).toEqual([])
   })
 
   test("runs a known read as the session's agent, with no model turn", async () => {

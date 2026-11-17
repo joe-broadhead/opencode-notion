@@ -39,12 +39,13 @@ npm run check
 | --- | --- |
 | `typecheck` | `tsc --noEmit` over `src/` and `test/`, strict, with unused names as errors |
 | `unit` | `bun test ./test/unit`: every module in `src/`, the docs' counts and error table, and the Jelly declaration |
+| `conformance` | `npm run conformance`: the source contract's conformance kit over the pages source, against the fake Notion in `test/support/fake-notion.ts`; writes `reports/conformance-report.json` and fails unless it is ok |
 | `build` | `node scripts/build.mjs`: deletes `dist/` and bundles `src/index.ts` and `src/tui.ts` with esbuild into the self-contained `dist/index.js` and `dist/tui.js`. Fails if a bundle imports anything the host does not provide |
 | `icons` | `node scripts/check-icons.mjs`: the SVG is clean and exact, the 128 and 256 rasters exist, and `exports` and `files` agree |
 | `host` | `bun test ./test/host`: the plugin inside an embedded OpenCode host, once on each tested release (`@opencode/sdk` 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0) |
 | `pack` | `bun test ./test/pack`: builds, packs and installs the package, imports both entry points, and loads it in stock OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0 |
 | `forbidden` | `node scripts/check-forbidden.mjs`: scans `src/`, `test/`, `scripts/` and `dist/` for forbidden APIs and machine-local paths |
-| `copies` | `node scripts/check-copies.mjs`: the tools RPC's shared part in `src/host/tools-rpc.ts`, outside its `PLUGIN-SPECIFIC` block, the declaration test kit in `test/support/jelly-kit.ts`, and Jelly's setting rules in `test/support/jelly-settings.ts` match the copies every plugin carries |
+| `copies` | `node scripts/check-copies.mjs`: the declaration test kit in `test/support/jelly-kit.ts`, Jelly's setting rules in `test/support/jelly-settings.ts` and the release kit's files match the copies every plugin carries |
 | `lint:actions` | `actionlint` over the workflows, when it is on PATH; CI runs it as its own job |
 | `whitelist` | Checks `package.json` against the approved package shape, and that `dist/` holds exactly `index.js` and `tui.js` |
 
