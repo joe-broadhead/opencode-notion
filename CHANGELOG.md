@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.4] - 2026-11-17
+
+### Added
+
+- A source of the source contract, `notion.pages`, declared in `package.json`'s `sources`: `events_list` lists the
+  workspace's pages and databases by the time they were last edited, as events with their title, edit time and link and
+  no page content, and `probe` names the workspace and the signed-in user and records them for the sign-in, which
+  `events_list` then lists for. Both are tools RPC methods, read only `notion-get-self` (probe) and `notion-search`
+  (events_list), and are allowed by the default rules under every `access` value. Listing by last edit needs a Business
+  or Enterprise workspace.
+- `npm run conformance` and the `conformance` stage of `npm run check`: the source contract's conformance kit over the
+  source, against a fake Notion, writing `reports/conformance-report.json` for the release to attach.
+
+### Changed
+
+- The tools RPC's transport is the source contract's `tools-rpc` module, bundled into `dist/index.js`, instead of a copy
+  in `src/host/tools-rpc.ts`, which now holds only Notion's part. Its methods, codes and next steps are unchanged. The
+  pack stage runs `probe` and `events_list` through it in stock OpenCode, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7
+  and 2.3.0.
+
 ## [0.0.3] - 2026-11-15
 
 ### Changed

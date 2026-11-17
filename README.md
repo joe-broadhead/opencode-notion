@@ -31,18 +31,18 @@ Notion is a trademark of Notion Labs, Inc.; this unofficial plugin is not endors
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-notion#v0.0.3
+opencode plugin add github:joe-broadhead/opencode-notion#v0.0.4
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/notion-status`: it shows `sign-in required` until you sign in
 (see [Sign in](#sign-in)).
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-notion#v0.0.2`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-notion#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-notion#v0.0.3`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-notion#v<version>`.
 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.3" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.4" }] }
 ```
 
 The plugin registers Notion's MCP server under the name `notion`, adds default permission rules, the `/notion-status`
@@ -115,6 +115,53 @@ opencode api post /api/rpc/notion.workspace.tools/notion-search \
 
 See [Scripting](https://github.com/joe-broadhead/opencode-notion/blob/HEAD/docs/scripting.md).
 
+### The pages source
+
+The plugin is also a source of the [source contract](https://github.com/we-the-rebel-alliance/source-contract):
+`package.json` declares `notion.pages`, which Memory and other consumers read through the same tools RPC, with two methods
+that are never tools the model sees.
+
+- `probe` reads `notion-get-self` and answers who is signed in: the account is the workspace's id, and the owner is the
+  signed-in user, `notion:` and their id, labelled with their name. The plugin keeps that for the sign-in, in memory,
+  until a sign-out or another account.
+- `events_list` lists the workspace's pages and databases by the time they were last edited, oldest first, from a cursor
+  or a `since`. One event is one page at one edit time: its title, the edit time to the minute, a link to the page, and
+  `page` or `database`. It reads only `notion-search`, with an empty query sorted by last edit, and names the workspace
+  and owner probe recorded: until a probe has, after a new sign-in or after OpenCode starts, it refuses with
+  `UNAVAILABLE` and asks for one.
+
+**It needs a Business or Enterprise workspace.** Probing and binding the source work on any plan, but on a lower one every
+`events_list` read is refused, because only those plans sort Notion's search by last edit. The source contract has no
+place for this in what a consumer shows at consent, so the methods' own descriptions say it.
+
+```sh
+opencode api post /api/rpc/notion.workspace.tools/events_list \
+  -H "x-opencode-directory:$PWD" \
+  -d '{"input":{"sessionID":"ses_…","input":{"since":"2026-11-16"}}}'
+```
+
+What the source can and cannot say comes from what Notion's search gives:
+
+- **Business or Enterprise only.** Notion sorts and filters search by last edit only for those plans. On any other plan it
+  drops the sort, and `events_list` refuses with `UNAVAILABLE` rather than list pages in another order.
+- **Calls.** One `events_list` call makes from 1 to 30 searches, and each page of a read walks back from the newest edit
+  again. They share the connection's Notion request limit with the model; nothing is billed.
+- **No page content and no editor.** An event's `text` is empty, and its `actors` are empty, because search names no
+  editor. Read a page with `notion-fetch` when you need it; a title is someone's writing and untrusted. A title that holds
+  a secret is refused (`refused[]`), never listed.
+- **The latest edit of each page.** Search lists only a page's last edit, so edits made between two reads of a page are
+  one event, at the last time. An edit is listed once its minute ended ten minutes ago.
+- **At most 50 at a time.** Search answers 50 results and no next page, and its date filter takes whole days, so a read
+  walks back from the newest edits a day at a time. When 50 or more edits fall on one day after the cursor, the earlier
+  edits of that day cannot be listed: a change to 50 or more pages or database rows at once hides the edits made earlier
+  that day since the last read. The page that reaches such a stretch says `gap: { "reason": "window-truncated" }` once,
+  from where it starts, and the read goes on after it; so does a read that runs out of its 30 searches. Polling more
+  often than 50 edits land keeps every edit.
+
+The cursor never expires. Its codes are the source contract's, such as `ACCOUNT_MISMATCH` for another workspace,
+`CURSOR_INVALID` and `RATE_LIMITED`. `npm run conformance` runs the contract's conformance kit over the source, and each
+release attaches its report.
+
 ## Permissions
 
 **Every tool is allowed by default.** The plugin adds one block to every agent, right after the agent's base rule that
@@ -130,7 +177,7 @@ There are three ways to restrict it.
 ```json
 {
   "plugins": [
-    { "package": "github:joe-broadhead/opencode-notion#v0.0.3", "options": { "access": "ask-changes" } }
+    { "package": "github:joe-broadhead/opencode-notion#v0.0.4", "options": { "access": "ask-changes" } }
   ]
 }
 ```
@@ -229,7 +276,9 @@ The plugin adds these rules for `access: "all"`:
     { "action": "notion_notion-send-message-to-session", "resource": "*", "effect": "allow" },
     { "action": "notion_notion-spawn-session", "resource": "*", "effect": "allow" },
     { "action": "notion_notion-stop-session", "resource": "*", "effect": "allow" },
-    { "action": "notion_notion-upload-skill", "resource": "*", "effect": "allow" }
+    { "action": "notion_notion-upload-skill", "resource": "*", "effect": "allow" },
+    { "action": "notion_events_list", "resource": "*", "effect": "allow" },
+    { "action": "notion_probe", "resource": "*", "effect": "allow" }
 ]
 ```
 
@@ -318,7 +367,9 @@ The plugin adds these rules for `access: "ask-changes"`:
     { "action": "notion_notion-send-message-to-session", "resource": "*", "effect": "ask" },
     { "action": "notion_notion-spawn-session", "resource": "*", "effect": "ask" },
     { "action": "notion_notion-stop-session", "resource": "*", "effect": "ask" },
-    { "action": "notion_notion-upload-skill", "resource": "*", "effect": "ask" }
+    { "action": "notion_notion-upload-skill", "resource": "*", "effect": "ask" },
+    { "action": "notion_events_list", "resource": "*", "effect": "allow" },
+    { "action": "notion_probe", "resource": "*", "effect": "allow" }
 ]
 ```
 
@@ -407,7 +458,9 @@ The plugin adds these rules for `access: "read-only"`:
     { "action": "notion_notion-send-message-to-session", "resource": "*", "effect": "deny" },
     { "action": "notion_notion-spawn-session", "resource": "*", "effect": "deny" },
     { "action": "notion_notion-stop-session", "resource": "*", "effect": "deny" },
-    { "action": "notion_notion-upload-skill", "resource": "*", "effect": "deny" }
+    { "action": "notion_notion-upload-skill", "resource": "*", "effect": "deny" },
+    { "action": "notion_events_list", "resource": "*", "effect": "allow" },
+    { "action": "notion_probe", "resource": "*", "effect": "allow" }
 ]
 ```
 
@@ -491,7 +544,7 @@ Set options with the object form of the plugin entry:
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.3", "options": { "allowUntestedHost": true } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.4", "options": { "allowUntestedHost": true } }]
 }
 ```
 
@@ -511,7 +564,7 @@ macOS, or `/etc/opencode/opencode.json` on Linux. This example also turns off de
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.3" }],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-notion#v0.0.4" }],
   "permissions": [{ "action": "notion_notion-delete-pages", "resource": "*", "effect": "deny" }]
 }
 ```
@@ -633,7 +686,7 @@ store.
    `/connect` → **Notion**. If it answers `MCP server not found: notion`, OpenCode is still opening that folder: wait a
    few seconds and run it again.
 2. Check: `opencode auth list` no longer lists **Notion**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-notion#v0.0.3`, then `opencode reload`. `opencode mcp list`
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-notion#v0.0.4`, then `opencode reload`. `opencode mcp list`
    no longer lists `notion`.
 4. Remove any Notion rules you copied into your agents' own `permissions`.
 

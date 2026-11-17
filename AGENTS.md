@@ -1,8 +1,8 @@
 # Repository rules
 
 This repository builds `@joe-broadhead/opencode-notion`, an OpenCode plugin that registers Notion's official MCP server
-and adds default permission rules, a status command, a status dialog, two skills and a tools RPC for scripts. It has no
-tool of its own. Read [docs/architecture.md](docs/architecture.md) before you change code, and [CONTRIBUTING.md](CONTRIBUTING.md)
+and adds default permission rules, a status command, a status dialog, two skills, a tools RPC for scripts, and one
+source-contract source, `notion.pages`. It has no tool of its own. Read [docs/architecture.md](docs/architecture.md) before you change code, and [CONTRIBUTING.md](CONTRIBUTING.md)
 for the checks and the release steps.
 
 ## Rules
@@ -15,7 +15,9 @@ for the checks and the release steps.
   rather than deprecate.
 - **No peers, no runtime dependencies, no lifecycle scripts.** `@opencode/plugin`, `@opencode/sdk` and `@opencode/client`
   (whose types the host tests use) are devDependencies pinned to exactly `2.2.3`. Do not add another host version to the
-  lockfile: the host stage installs the other tested SDKs into a temp folder.
+  lockfile: the host stage installs the other tested SDKs into a temp folder. The source contract
+  (`@we-the-rebel-alliance/source-contract`) is a devDependency pinned to a release tag; the build bundles what the
+  plugin imports from it into `dist/index.js`.
 - **Ship prebuilt, one file per entry.** `scripts/build.mjs` bundles `src/index.ts` and `src/tui.ts` with esbuild into the
   self-contained `dist/index.js` and `dist/tui.js`: no chunks, no relative imports, and only host-provided modules
   external. `tsc` only typechecks. No declaration files, `.tsx` or JSX.
@@ -67,10 +69,18 @@ for the checks and the release steps.
   `true`, so the README carries the trademark line. Do not recolour, redraw or combine it. `scripts/check-icons.mjs`
   is the kit's check, copied verbatim, and is the one definition of a safe icon: it runs in the `icons` stage of
   `npm run check`.
+- **The pages source.** `src/source.ts` is `notion.pages`, declared in `package.json`'s top-level `sources`: `events_list`
+  and `probe`, tools RPC methods only, read through OpenCode's executors for `notion-get-self` (probe only) and
+  `notion-search` (events_list only) and nothing else, and never page content. `events_list` never reads who is signed
+  in: it lists for what probe recorded for the sign-in. `permission.operations` is exactly the tools they read,
+  `notion-get-self` is the identity operation, the descriptor carries no key a contract 0.1 consumer refuses, and `npm run conformance` (the `conformance` stage) runs the source contract's kit over the fake in
+  `test/support/fake-notion.ts`, writing `reports/conformance-report.json`; its report must be ok. The source's codes are
+  the contract's (`SourceError`), not `CODES`.
 - **TypeScript.** No enums, namespaces or parameter properties. `import type` for types, `.js` in relative imports.
-- **The tools RPC.** `src/host/tools-rpc.ts` is a copy of a module shared by several plugins. Change only its block between
-  the `PLUGIN-SPECIFIC` markers here; change the rest in the shared copy first. Its methods are every known tool in
-  `src/notion-tools.ts`, by exact name and with its class, and never an unknown tool. A write or a change of the
+- **The tools RPC.** The transport is the source contract's `tools-rpc` module, never a copy; `src/host/tools-rpc.ts`
+  holds Notion's part of it, the plugin value and the method table. Its methods are every known tool in
+  `src/notion-tools.ts`, by exact name and with its class, and never an unknown tool, then the plugin's own two reads,
+  `events_list` and `probe`. A write or a change of the
   destructive class is a method but runs only on a resolved `allow`; under `access: "all"` the default allow is that
   allow. Keep the RPC id `notion.workspace.tools` and its method names stable, hyphens included: scripts call them by
   name.
@@ -110,9 +120,9 @@ enforces the same wording rules over the shipped docs:
   `permission.ask`;
 - the deprecated `ctx.generate.text` and `experimental.policies`;
 - importing `@opencode/ai`;
-- a permission hook, except the one `permission.hook("evaluate")` in `src/host/tools-rpc.ts` (and the bundle that inlines
-  it), exactly once each: it turns an `ask` on one of the tools RPC's own script calls in flight into a deny, because no one
-  can answer it, and touches nothing else;
+- a permission hook in the plugin's own source; the bundle carries exactly one, the source contract's tools RPC's
+  `permission.hook("evaluate")`: it turns an `ask` on one of the tools RPC's own script calls in flight into a deny,
+  because no one can answer it, and touches nothing else;
 - references to private host source or host checkouts;
 - machine-local home and temp paths;
 - `.tsx` or `.jsx` files in `dist/`.

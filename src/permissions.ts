@@ -1,7 +1,7 @@
 import type { Plugin } from "@opencode/plugin"
 import { errorText, SERVER_NAME } from "./constants.js"
 import { reasonOf } from "./redact.js"
-import { ALL_TOOLS, classify } from "./notion-tools.js"
+import { ALL_TOOLS, PLUGIN_METHODS, classify } from "./notion-tools.js"
 
 export interface Rule {
   readonly action: string
@@ -34,12 +34,13 @@ const rule = (tool: string, effect: Rule["effect"]): Rule => ({ action: actionOf
 /**
  * The block the plugin inserts, generated from the tool table and `access`. Broad first, narrow last, because the last
  * matching rule wins: the namespace pattern covers every Notion tool, including one Notion adds later, and each known
- * tool then gets its class's effect. With `access: "all"` every rule allows; `ask-changes` asks for anything but a
- * read; `read-only` denies anything but a read.
+ * tool then gets its class's effect, and the plugin's own two reads come last, allowed. With `access: "all"` every rule
+ * allows; `ask-changes` asks for anything but a read; `read-only` denies anything but a read.
  */
 export const defaultRules = (access: Access = "all"): Rule[] => [
   rule("*", access === "all" ? "allow" : access === "ask-changes" ? "ask" : "deny"),
   ...ALL_TOOLS.map((tool) => rule(tool, effectOf(tool, access))),
+  ...PLUGIN_METHODS.map((method) => rule(method, "allow")),
 ]
 
 const same = (a: Rule, b: Rule) => a.action === b.action && a.resource === b.resource && a.effect === b.effect

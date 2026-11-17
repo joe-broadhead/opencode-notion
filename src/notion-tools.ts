@@ -139,6 +139,13 @@ export const PARAMETERS: Readonly<Record<string, readonly string[]>> = {}
 /** Every known tool, in the order the default rules list them. */
 export const ALL_TOOLS: readonly string[] = [...READ_TOOLS, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS]
 
+/**
+ * The plugin's own reads, tools RPC methods only and never tools Notion lists: `events_list` and `probe`, the pages
+ * source's (`src/source.ts`). Their actions, `notion_events_list` and `notion_probe`, match the default block's
+ * `notion_*` pattern, so the block allows them by name under every `access`, like a read.
+ */
+export const PLUGIN_METHODS: readonly string[] = ["events_list", "probe"]
+
 type ToolClass = "read" | "write" | "destructive" | "unknown"
 
 export function classify(name: string): ToolClass {

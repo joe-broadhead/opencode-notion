@@ -3,7 +3,9 @@ import { watchAccount } from "./account.js"
 import { reasonOf } from "./redact.js"
 import { errorText, NAMESPACE_DESCRIPTION, OAUTH_SCOPE, PLUGIN_ID, SERVER_NAME } from "./constants.js"
 import { checkHost } from "./host-version.js"
-import { registerToolsRpc, METHODS } from "./host/tools-rpc.js"
+import { registerToolsRpc } from "@we-the-rebel-alliance/source-contract/tools-rpc"
+import { METHODS, PLUGIN } from "./host/tools-rpc.js"
+import { eventsMethod, probeMethod, signIns } from "./source.js"
 import { watchIntegration } from "./integration.js"
 import { parseOptions } from "./options.js"
 import { defaultRules, registerDefaultRules } from "./permissions.js"
@@ -107,14 +109,29 @@ export function createNotionPlugin(seam: NotionSeam) {
       await registerDefaultRules(ctx.agent, defaultRules(options.access), report("rules"))
       // The workspace name and connection type come from the model's own notion-get-self calls, never from a call of
       // the plugin's; the watcher also notes when the server last changed status.
-      const account = await watchAccount(ctx, () => source?.type === "adopted" && source.signIn === "own", owned)
+      // What probe read for each sign-in; forgotten with the account rows on a sign-out or another account.
+      const known = signIns()
+      const account = await watchAccount(ctx, () => source?.type === "adopted" && source.signIn === "own", owned, () => known.clear())
       const own = skills.map((skill) => ({ id: skill.id, path: skill.path }))
       const read = () => readStatus(ctx, () => ({ ...(source ? { source } : {}), host, problems: [...problems.values()], skills: own, account, listing: account, access: options.access }))
       await registerSkills(ctx.skill, skills)
       await registerStatusCommand(ctx, read)
       await registerStatusRpc(ctx.rpc, read)
       // Scripts call the known reads with no model, as a session and its agent.
-      const stopTools = await registerToolsRpc(ctx, { methods: METHODS, mcp: { server: SERVER_NAME, managed: () => source?.type !== "conflict" } })
+      // events_list and probe are the plugin's own reads, the pages source's (package.json's `sources`): they read
+      // through OpenCode's executors for Notion's tools, as the calling session. The sign-in is OpenCode's credential
+      // for the server: probe records who it is, and a listing names that workspace and owner.
+      const signIn = async () => {
+        const server = (await ctx.mcp.list()).data.find((entry) => entry.name === SERVER_NAME)
+        const connection = server?.integrationID ? await ctx.integration.connection.active(server.integrationID) : undefined
+        return connection?.type === "credential" ? connection.id : undefined
+      }
+      const pages = { tool: ctx.tool, mcp: ctx.mcp, permission: ctx.permission, signIn, signIns: known }
+      const stopTools = await registerToolsRpc(ctx as never, {
+        plugin: PLUGIN,
+        methods: [...METHODS, eventsMethod(pages), probeMethod(pages)],
+        mcp: { server: SERVER_NAME, managed: () => source?.type !== "conflict" },
+      })
       const stopWatch = watchIntegration(ctx, owned)
       return async () => {
         await stopWatch()

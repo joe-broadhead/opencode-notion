@@ -6,7 +6,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { CODES, TESTED_HOSTS, UNTESTED_EXAMPLE } from "../../src/constants.js"
-import { DESTRUCTIVE_TOOLS, PARAMETERS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
+import { DESTRUCTIVE_TOOLS, PARAMETERS, PLUGIN_METHODS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
 import { METHODS, NEXT_STEPS, TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
 import { ACCESS, defaultRules } from "../../src/permissions.js"
 
@@ -273,7 +273,7 @@ describe("docs", () => {
   // R1: every example runs the RPC this plugin registers, with the location header and the envelope, and names a method
   // in the table. A `<method>` placeholder names no method, but it must still carry the header and the body shape.
   test("every scripting example has the RPC id, the location header, the envelope, and a method in the table", () => {
-    const names = new Set(["describe", ...METHODS.map((method) => method.name)])
+    const names = new Set(["describe", ...METHODS.map((method) => method.name), ...PLUGIN_METHODS])
     let examples = 0
     for (const file of ["docs/scripting.md", "README.md"]) {
       // A shell continuation joins its line, so one example is one logical line.
