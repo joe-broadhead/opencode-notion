@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- source-contract is pinned at v0.3.0 (`github:we-the-rebel-alliance/source-contract#v0.3.0`), still bundled into
+  `dist/index.js` with no runtime dependency. The declaration and both methods are unchanged and carry none of the keys
+  v0.3.0 adds (`facts`, `hints`, `routines`, an actor's `kind`, an event's `sections` and `parts`), so jelly, Memory and
+  Artifacts on v0.2.x read them as before.
+- No behaviour change beyond the pin, and no host-support change: still tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2, with the supported range unchanged (`>=2.2.3 <2.4.0`).
+
 ## [0.0.5] - 2026-11-18
 
 ### Changed
