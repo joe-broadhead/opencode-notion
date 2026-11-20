@@ -4,13 +4,45 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Fixed
+
+- **`events_list` works after any restart of OpenCode, with no `probe` before it.** Until now the plugin kept who is
+  signed in only in memory, and only `probe` filled it. A consumer that probes once, at bind, such as Memory, found
+  every later listing `UNAVAILABLE` ("no probe has named this sign-in's workspace") after OpenCode started again, a
+  plugin reload, or a second OpenCode process, for good. Now a listing that does not know the sign-in yet makes the one
+  identity read `probe` makes (`notion-get-self`, the declared identity operation), once, keeps the answer for the
+  sign-in as `probe` does, and then runs. The workspace check is as strict as before: another workspace than the
+  signed-in one is `ACCOUNT_MISMATCH`, before any search. An identity read that fails, or answers without a workspace and
+  user, is `UNAVAILABLE`, and nothing is kept. An invalid request or another source is still refused before any read.
+- **A credential update forgets who is signed in, as a credential switch does.** A new sign-in may keep its credential
+  id and be another person or workspace, so a listing that follows one reads who is signed in again instead of naming
+  the workspace read before it.
+- **Listings that start together make one identity read**, and a read that is in flight across a sign-out or a
+  credential change keeps nothing: a listing whose read crossed one is `UNAVAILABLE` rather than name a sign-in that
+  may no longer be current.
+- **A rate limit in one of a call's searches no longer fails the whole call.** What the searches read is answered, with
+  the cursor the call was given and `more: true`, so the next call reads the window again and no edit is skipped; the
+  call makes no further search once Notion rate-limits it, so nothing is retried before the retry-after. A call that
+  read nothing is still `RATE_LIMITED`, with that wait.
+
 ### Changed
 
+- **`notion.pages` lists only the pages Notion's search returns for you, not every page the sign-in can reach.** Until
+  now `events_list` listed the whole workspace by last edit, other people's documents included. Every search now carries
+  one of Notion's own author filters for your user (`filters.edited_by_user_ids`, then `filters.created_by_user_ids`,
+  each `["me"]`), and a listing is the union of the two, each page once: the pages you created, and the pages its edited-by
+  filter returns. Notion's documentation does not say which edits that filter matches, so a listed page's latest edit may
+  be someone else's, and the method descriptions, README and architecture guide claim only what the filters return.
+  Notion applies these filters only on the Business and Enterprise plans, as it does the sort; if its search answers
+  with a notice that it left out any option, the listing is `UNAVAILABLE`, never a wider list. One call now makes up to 60
+  searches (30 for each filter), where it made up to 30. The descriptor has no place for a consent sentence (a `scope`
+  needs at least one key to choose, and this source has none), so `package.json`'s `sources` gains no `scope`, and it
+  carries no key a consumer on source-contract 0.1 refuses.
 - source-contract is pinned at v0.3.0 (`github:we-the-rebel-alliance/source-contract#v0.3.0`), still bundled into
   `dist/index.js` with no runtime dependency. The declaration and both methods are unchanged and carry none of the keys
   v0.3.0 adds (`facts`, `hints`, `routines`, an actor's `kind`, an event's `sections` and `parts`), so jelly, Memory and
   Artifacts on v0.2.x read them as before.
-- No behaviour change beyond the pin, and no host-support change: still tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2, with the supported range unchanged (`>=2.2.3 <2.4.0`).
+- The pin itself changes no behaviour, and no host-support change: still tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2, with the supported range unchanged (`>=2.2.3 <2.4.0`).
 
 ## [0.0.5] - 2026-11-18
 

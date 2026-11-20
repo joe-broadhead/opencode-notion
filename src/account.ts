@@ -99,7 +99,7 @@ export async function watchAccount(
 ) {
   let account: Account | undefined
   // Survives the clear on `needs_auth`: an account that was read before a challenge means the sign-in worked, so a
-  // revoked grant is the likely cause. A credential switch forgets it, because that is another account.
+  // revoked grant is the likely cause. A credential update or switch forgets it, because that may be another account.
   let known = false
   let changedAt = Date.now()
   const capture = (result: AccountResult) => {
@@ -113,7 +113,8 @@ export async function watchAccount(
   captures.add(entry)
 
   const stopped = new AbortController()
-  // Signed out (the server needs a sign-in again) or another account: what was read no longer holds.
+  // Signed out (the server needs a sign-in again), or a credential updated or switched: what was read no longer holds.
+  // A new sign-in may keep its credential id and be another person or workspace.
   const check = async () => {
     const server = (await ctx.mcp.list()).data.find((item) => item.name === SERVER_NAME)
     if (server?.status.status !== "connected" && server?.status.status !== "pending") {
@@ -124,9 +125,9 @@ export async function watchAccount(
   const watching = (async () => {
     while (!stopped.signal.aborted) {
       try {
-        const events = ctx.event.subscribe({ types: ["mcp.status.changed", "credential.switched"], signal: stopped.signal })
+        const events = ctx.event.subscribe({ types: ["mcp.status.changed", "credential.updated", "credential.switched"], signal: stopped.signal })
         for await (const event of events) {
-          if (event.type === "credential.switched") {
+          if (event.type === "credential.updated" || event.type === "credential.switched") {
             account = undefined
             known = false
             forgotten()

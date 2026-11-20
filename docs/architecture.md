@@ -159,12 +159,18 @@ only and never tools:
 - `probe` asserts `notion_probe`, then reads `notion-get-self`: the account is the workspace's id, and the owner is the
   signed-in user, `notion:` and their id, labelled with their name. It records them for the sign-in, OpenCode's credential
   for the server; `watchAccount` clears the record on `credential.switched` or a status that is not connected.
-- `events_list` asserts `notion_events_list` and reads only `notion-search`, with an empty query, `sort: "last_edited"`
-  and `filters.last_edited_date_range`. It never reads who is signed in: it names the workspace and owner probe recorded
-  for the sign-in, and refuses with `UNAVAILABLE` ("call probe") until there is one. Notion runs that sort and that filter
+- `events_list` asserts `notion_events_list` and reads only `notion-search`, with an empty query, `sort: "last_edited"`,
+  `filters.last_edited_date_range` and one author filter for the signed-in user (`filters.edited_by_user_ids`, then
+  `filters.created_by_user_ids`, each `["me"]`): it walks once with each and lists the union, each page once, so only
+  the pages those filters return are read. Notion's documentation does not say which edits `edited_by_user_ids` matches,
+  so a listed page's latest edit may be someone else's; nothing more is claimed. It names the workspace and owner of the sign-in: what probe or an earlier listing
+  recorded for it, else it makes the same `notion-get-self` read itself, once, and records it, so it needs no probe
+  before it and survives a restart (a failed read is `UNAVAILABLE`, another workspace `ACCOUNT_MISMATCH`, both before any
+  search). Notion runs that sort and those filters
   only for Business and Enterprise workspaces; on another plan it drops them with a notice, and the source refuses with
-  `UNAVAILABLE` rather than list pages in another order. The descriptor has no consent note, so the methods'
-  descriptions and the README say so.
+  `UNAVAILABLE` (on any notice about an omitted or ignored option) rather than list pages in another order or other
+  people's pages. The descriptor carries no `scope`, which needs at least one key to choose, so the methods'
+  descriptions and the README say what is read.
 
 Each result gives a page's id, title, URL, type and `timestamp`, its last edit to the minute; no tool names the editor,
 so `actors` is empty, and no content is read, so `text` is empty. One event is one page at one edit time (`external_id`
@@ -175,7 +181,7 @@ does not state. `walk` steps back from the newest edits: each search is complete
 asks for edits on or before that result's own day, found by trying dates from the earliest the time can fall on (UTC−12)
 until one answers an edit at or after it; what each answer shows narrows the zone for the next guess. When 50 edits at or
 after that time fill their day's answer, the earlier edits of that day are a hole, and the walk goes on with the day
-before; whatever 30 searches do not reach is a hole too. A page lists the edits from its cursor up to the first hole; when
+before; whatever 30 searches of a walk do not reach is a hole too. The two walks' holes are joined where they overlap. A page lists the edits from its cursor up to the first hole; when
 the cursor sits right before a hole, it says `gap: { reason: "window-truncated" }` from where the hole starts and lists the
 edits after it, so each hole is answered once. An edit is listed once its minute ended ten minutes ago. The cursor is the
 source contract's, bound to the plugin, the source and the workspace, and holds the last (time, page id) listed; it never

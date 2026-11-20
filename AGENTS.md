@@ -70,12 +70,21 @@ for the checks and the release steps.
   is the kit's check, copied verbatim, and is the one definition of a safe icon: it runs in the `icons` stage of
   `npm run check`.
 - **The pages source.** `src/source.ts` is `notion.pages`, declared in `package.json`'s top-level `sources`: `events_list`
-  and `probe`, tools RPC methods only, read through OpenCode's executors for `notion-get-self` (probe only) and
-  `notion-search` (events_list only) and nothing else, and never page content. `events_list` never reads who is signed
-  in: it lists for what probe recorded for the sign-in. `permission.operations` is exactly the tools they read,
-  `notion-get-self` is the identity operation, the descriptor carries no key a contract 0.1 consumer refuses, and `npm run conformance` (the `conformance` stage) runs the source contract's kit over the fake in
-  `test/support/fake-notion.ts`, writing `reports/conformance-report.json`; its report must be ok. The source's codes are
-  the contract's (`SourceError`), not `CODES`.
+  and `probe`, tools RPC methods only, read through OpenCode's executors for `notion-get-self` and `notion-search` and
+  nothing else, and never page content. `events_list` reads only the pages Notion's search returns for the signed-in
+  person: every search carries an author filter (`filters.created_by_user_ids` or `filters.edited_by_user_ids`, `["me"]`),
+  never none, and a notice that Notion omitted an option refuses the listing, since a result carries no author to check.
+  It names the sign-in's workspace and owner from what `probe` or an earlier listing kept for it, else it makes the same
+  `notion-get-self` read itself, once: never make a listing depend on a probe in this process, since Memory probes only at
+  bind; listings at once share one read, and a read that started before a clear stores nothing. A rate limit ends a call's
+  searches: what it read is answered with the cursor the call was given and `more: true`, never an error, so nothing is
+  skipped and nothing is retried before the retry-after. `permission.operations` is exactly the tools they read,
+  `notion-get-self` is the identity operation. Declare or send no key a consumer on source-contract 0.1 refuses
+  (`removals[]`, `owner.verified`, `identityRules`, `accounts.server`, `readsIdentity`, a price's `conditions` or `min`,
+  an empty `identity`) until the consumers are on 0.2: `npm run conformance` (the `conformance` stage) runs the source
+  contract's kit over the fake in `test/support/fake-notion.ts`, its session probing before it lists, and writes
+  `reports/conformance-report.json`; its report must be ok. The source's codes are the contract's (`SourceError`), not
+  `CODES`.
 - **TypeScript.** No enums, namespaces or parameter properties. `import type` for types, `.js` in relative imports.
 - **The tools RPC.** The transport is the source contract's `tools-rpc` module, never a copy; `src/host/tools-rpc.ts`
   holds Notion's part of it, the plugin value and the method table. Its methods are every known tool in

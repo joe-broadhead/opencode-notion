@@ -6,8 +6,9 @@
 // `filters.last_edited_date_range` takes whole dates (start and end inclusive, each optional) in a time zone Notion does
 // not state, UTC unless a test names another, at most `page_size`
 // results (50 at most) and no next page, and each result has an id, title, URL, type and `timestamp`, its last edit to
-// the minute. On a plan without the Business options, Notion drops the sort and the date filter, runs no search for an
-// empty query, and says so in `notices`.
+// the minute. `filters.created_by_user_ids` and `filters.edited_by_user_ids` keep the pages whose creator or editor is
+// one of the ids, `"me"` being the signed-in user, as the tool's schema describes them. On a plan without the Business
+// options, Notion drops the sort and the filters, runs no search for an empty query, and says so in `notices`.
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { signIns, type SignIns } from "../../src/source.js"
@@ -19,6 +20,10 @@ export interface FakePage {
   readonly type: "page" | "database"
   readonly title: string
   readonly edited: string
+  /** The user who created it; the signed-in user when left out. */
+  readonly createdBy?: string
+  /** A user `filters.edited_by_user_ids` matches for this page; the signed-in user when left out. Notion does not say which edits it matches. */
+  readonly editedBy?: string
 }
 
 export interface Fixture {
@@ -52,6 +57,12 @@ export interface FakeOptions {
   readonly status?: "connected" | "needs_auth" | "failed"
   /** A Notion failure for this tool, as OpenCode's executor raises it. */
   readonly fail?: { readonly tool: string; readonly message: string }
+  /** A Notion failure on this notion-search attempt (1-based, counted from the context's first), once. */
+  readonly failSearchAt?: { readonly at: number; readonly message: string }
+  /** Holds this tool's answer until `until` resolves, so a test can interleave two calls. */
+  readonly hold?: { readonly tool: string; readonly until: Promise<void> }
+  /** `dropped`: the search leaves the created-by and edited-by filters out and says so in `notices`, as it does for an option the plan lacks. */
+  readonly authors?: "applied" | "dropped"
   /** Another notion-get-self answer. */
   readonly self?: unknown
   /** Every search's input, in order. */
@@ -68,7 +79,14 @@ export interface FakeOptions {
 const dateIn = (iso: string, zone: number) => new Date(Date.parse(iso) + zone * 3_600_000).toISOString().slice(0, 10)
 
 /** notion-search's answer for an input, over `pages`. */
-export function searchAnswer(pages: readonly FakePage[], input: Record<string, unknown>, plan: "business" | "free" = "business", zone = 0): Record<string, unknown> {
+export function searchAnswer(
+  pages: readonly FakePage[],
+  input: Record<string, unknown>,
+  plan: "business" | "free" = "business",
+  zone = 0,
+  me = "",
+  authors: "applied" | "dropped" = "applied",
+): Record<string, unknown> {
   if (plan === "free") {
     return {
       results: [],
@@ -79,10 +97,14 @@ export function searchAnswer(pages: readonly FakePage[], input: Record<string, u
       ],
     }
   }
-  const filters = (input["filters"] ?? {}) as { last_edited_date_range?: { start_date?: string; end_date?: string } }
+  const filters = (input["filters"] ?? {}) as { last_edited_date_range?: { start_date?: string; end_date?: string }; created_by_user_ids?: string[]; edited_by_user_ids?: string[] }
   const range = filters.last_edited_date_range ?? {}
   const size = Math.min(50, Math.max(1, Number(input["page_size"] ?? 10)))
+  const ids = (list: string[] | undefined) => list?.map((id) => (id === "me" ? me : id))
+  const [creators, editors] = authors === "applied" ? [ids(filters.created_by_user_ids), ids(filters.edited_by_user_ids)] : [undefined, undefined]
   const results = pages
+    .filter((page) => creators === undefined || creators.includes(page.createdBy ?? me))
+    .filter((page) => editors === undefined || editors.includes(page.editedBy ?? me))
     .filter((page) => (range.start_date === undefined || dateIn(page.edited, zone) >= range.start_date) && (range.end_date === undefined || dateIn(page.edited, zone) <= range.end_date))
     .sort((a, b) => Date.parse(b.edited) - Date.parse(a.edited))
     .slice(0, size)
@@ -94,7 +116,11 @@ export function searchAnswer(pages: readonly FakePage[], input: Record<string, u
       highlight: "",
       timestamp: new Date(Math.floor(Date.parse(page.edited) / 60_000) * 60_000).toISOString(),
     }))
-  return { results, type: "workspace_search" }
+  return {
+    results,
+    type: "workspace_search",
+    ...(authors === "dropped" ? { notices: ["These options were omitted: filters.created_by_user_ids, filters.edited_by_user_ids. Results may be broader than requested."] } : {}),
+  }
 }
 
 /** A Tool.Error without a cause, as OpenCode's executor raises Notion's own failure. */
@@ -105,11 +131,14 @@ type Assert = (input: { readonly action: string; readonly resources: readonly st
 /** The plugin context the source reads through: Notion's two tools, the server's state, and the caller's permission. */
 export function fakeContext(fixture: Fixture, assert: Assert, options: FakeOptions = {}) {
   const pages = options.pages ?? (() => pagesOf(fixture))
+  let searches = 0
   const answers: Record<string, (input: Record<string, unknown>) => unknown> = {
     "notion-get-self": () => options.self ?? fixture.self,
     "notion-search": (input) => {
       options.searches?.push(input)
-      return searchAnswer(pages(), input, options.plan, options.zone)
+      searches += 1
+      if (options.failSearchAt?.at === searches) throw toolError(options.failSearchAt.message)
+      return searchAnswer(pages(), input, options.plan, options.zone, fixture.self.user["id"] ?? "", options.authors)
     },
   }
   const status = options.status ?? "connected"
@@ -118,6 +147,7 @@ export function fakeContext(fixture: Fixture, assert: Assert, options: FakeOptio
     execute: async (input: Record<string, unknown>) => {
       // OpenCode's executor asserts the tool's own action before it calls Notion.
       await assert({ action: `notion_${name}`, resources: ["*"] })
+      if (options.hold?.tool === name) await options.hold.until
       if (options.fail?.tool === name) throw toolError(options.fail.message)
       return { content: [{ type: "text", text: JSON.stringify(answer(input)) }] }
     },

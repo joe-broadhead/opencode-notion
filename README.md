@@ -124,15 +124,23 @@ that are never tools the model sees.
 - `probe` reads `notion-get-self` and answers who is signed in: the account is the workspace's id, and the owner is the
   signed-in user, `notion:` and their id, labelled with their name. The plugin keeps that for the sign-in, in memory,
   until a sign-out or another account.
-- `events_list` lists the workspace's pages and databases by the time they were last edited, oldest first, from a cursor
-  or a `since`. One event is one page at one edit time: its title, the edit time to the minute, a link to the page, and
-  `page` or `database`. It reads only `notion-search`, with an empty query sorted by last edit, and names the workspace
-  and owner probe recorded: until a probe has, after a new sign-in or after OpenCode starts, it refuses with
-  `UNAVAILABLE` and asks for one.
+- `events_list` lists the pages and databases **you created**, plus those Notion's search returns for its edited-by
+  filter with your id, by the time they were last edited, oldest first, from a cursor or a `since`. It never lists a
+  page that neither filter returns, whoever else works in the workspace. One event is one page at one edit time: its
+  title, the edit time to the minute, a link to the page, and `page` or `database`. It reads only `notion-search`, with
+  an empty query sorted by last edit and one author filter for you (`filters.edited_by_user_ids`, then
+  `filters.created_by_user_ids`, each set to `"me"`), so Notion itself decides which pages are listed; it lists the union,
+  each page once. It names the workspace
+  and owner of the sign-in: what `probe` or an earlier listing kept for it, else it makes the same `notion-get-self`
+  read itself, once, so it needs no `probe` before it and works after a restart of OpenCode. If Notion cannot answer that
+  read it refuses with `UNAVAILABLE`, and another workspace than the signed-in one is `ACCOUNT_MISMATCH`.
 
 **It needs a Business or Enterprise workspace.** Probing and binding the source work on any plan, but on a lower one every
-`events_list` read is refused, because only those plans sort Notion's search by last edit. The source contract has no
-place for this in what a consumer shows at consent, so the methods' own descriptions say it.
+`events_list` read is refused, because only those plans sort Notion's search by last edit and filter it by who created or
+edited. The same refusal follows if Notion's search answers with a notice that it left out any option, so a search that
+did not apply the author filter is never read as your pages. The source contract has no place for this, or for the
+author filter, in what a consumer shows at consent (a descriptor's `scope` needs a key to choose, and this source has
+none), so the methods' own descriptions say it.
 
 ```sh
 opencode api post /api/rpc/notion.workspace.tools/events_list \
@@ -142,12 +150,18 @@ opencode api post /api/rpc/notion.workspace.tools/events_list \
 
 What the source can and cannot say comes from what Notion's search gives:
 
-- **Business or Enterprise only.** Notion sorts and filters search by last edit only for those plans. On any other plan it
-  drops the sort, and `events_list` refuses with `UNAVAILABLE` rather than list pages in another order.
-- **Calls.** One `events_list` call makes from 1 to 30 searches, and each page of a read walks back from the newest edit
-  again. They share the connection's Notion request limit with the model; nothing is billed.
-- **No page content and no editor.** An event's `text` is empty, and its `actors` are empty, because search names no
-  editor. Read a page with `notion-fetch` when you need it; a title is someone's writing and untrusted. A title that holds
+- **Business or Enterprise only.** Notion sorts and filters search by last edit, and by who edited, only for those plans.
+  On any other plan it drops them, and `events_list` refuses with `UNAVAILABLE` rather than list pages in another order
+  or other people's pages.
+- **Your pages, as Notion's filters see them.** A page is listed when Notion's search returns it for your created-by
+  filter or for your edited-by filter. Notion's documentation does not say which edits `edited_by_user_ids` matches (the
+  first, the latest, or any), so this source claims only what the filter returns, never that you made the latest edit:
+  the latest edit, the time an event carries, may be someone else's. This plugin only passes the filters: it does not
+  check a result's author itself, because search results carry no author.
+- **Calls.** One `events_list` call makes from 2 to 60 searches (a walk for the pages you edited, and one for the pages
+  you created, up to 30 each), and each page of a read walks back from the newest edit again. They share the connection's Notion request limit with the model; nothing is billed.
+- **No page content and no editor.** An event's `text` is empty, and its `actors` are empty, because a search result
+  names no editor. Read a page with `notion-fetch` when you need it; a title is someone's writing and untrusted. A title that holds
   a secret is refused (`refused[]`), never listed.
 - **The latest edit of each page.** Search lists only a page's last edit, so edits made between two reads of a page are
   one event, at the last time. An edit is listed once its minute ended ten minutes ago.
