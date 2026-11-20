@@ -91,7 +91,8 @@ describe("events_list", () => {
   test("after a probe recorded the sign-in, asserts its own action, then notion-search, and does not read who is signed in again", async () => {
     const h = harness()
     await h.list({ since: "2026-11-15T00:00:00Z" })
-    expect(h.asserted).toEqual([EVENTS_ACTION, "notion_notion-search"])
+    // One search for the pages the person edited, one for those they created.
+    expect(h.asserted).toEqual([EVENTS_ACTION, "notion_notion-search", "notion_notion-search"])
   })
 
   test("after a restart, with no probe yet, a fresh instance reads who is signed in itself, with notion-get-self only, keeps it, and lists", async () => {
@@ -147,11 +148,15 @@ describe("events_list", () => {
     expect(known.get("crd_other")!.account).toBe(FIXTURE.otherWorkspace)
   })
 
-  test("searches every edit since the cursor, sorted by last edit, with no highlight, from the earliest local date", async () => {
+  test("searches every edit since the cursor, sorted by last edit, with no highlight, from the earliest local date, once for the pages the person edited and once for those they created", async () => {
     const h = harness()
     await h.list({ since: "2026-11-15T06:00:00Z" })
     // 06:00 UTC is still 14 November at UTC−12.
-    expect(h.searches).toEqual([{ query: "", sort: "last_edited", filters: { last_edited_date_range: { start_date: "2026-11-14" } }, page_size: SEARCH_PAGE, max_highlight_length: 0 }])
+    const range = { last_edited_date_range: { start_date: "2026-11-14" } }
+    expect(h.searches).toEqual([
+      { query: "", sort: "last_edited", filters: { ...range, edited_by_user_ids: ["me"] }, page_size: SEARCH_PAGE, max_highlight_length: 0 },
+      { query: "", sort: "last_edited", filters: { ...range, created_by_user_ids: ["me"] }, page_size: SEARCH_PAGE, max_highlight_length: 0 },
+    ])
   })
 
   test("pages with a limit, and a cursor goes on where the last page stopped, never repeating or skipping an edit", async () => {
@@ -214,7 +219,8 @@ describe("events_list", () => {
     }
     const h = harness({}, fixture)
     const page = await h.list({ since: "2026-10-01T00:00:00Z", limit: 500 })
-    expect(h.searches).toHaveLength(MAX_SEARCHES)
+    // Each of the two walks, the pages the person edited and those they created, stops at its own limit.
+    expect(h.searches).toHaveLength(2 * MAX_SEARCHES)
     expect(page.gap).toEqual({ reason: "window-truncated", since: "2026-10-01T00:00:00.000Z" })
     const times = page.events.map((event) => Date.parse(event.occurred_at))
     expect(times).toEqual([...times].sort((a, b) => a - b))
@@ -302,6 +308,69 @@ describe("events_list", () => {
     expect(notionUrl("https://www.notion.so/Page-abc")).toBe("https://www.notion.so/Page-abc")
     for (const url of ["http://app.notion.com/p/abc", "https://evil.example/p/abc", "https://app.notion.com.evil.example/p", "javascript:alert(1)", 42]) expect(notionUrl(url)).toBeNull()
     expect(URL_HOSTS).toEqual(declaredSources().items[0]!.urlHosts!)
+  })
+})
+
+describe("events_list reads only the signed-in person's own pages", () => {
+  const ME = FIXTURE.self.user["id"]!
+  const OTHER = "7f7f7f7f-0000-4000-8000-0000000000aa"
+  const page = (n: number, title: string, createdBy: string, editedBy: string, edited = "2026-11-15T12:00:00.000Z") => ({
+    id: `4d4d4d4d-0000-4000-8000-${String(n).padStart(12, "0")}`,
+    type: "page" as const,
+    title,
+    edited,
+    createdBy,
+    editedBy,
+  })
+  const others: Fixture = {
+    ...FIXTURE,
+    pages: [
+      ...FIXTURE.pages,
+      page(1, "Other's roadmap", OTHER, OTHER, "2026-11-15T12:01:00.000Z"),
+      page(2, "Mine, since edited by other", ME, OTHER, "2026-11-15T12:02:00.000Z"),
+      page(3, "Other's, since edited by me", OTHER, ME, "2026-11-15T12:03:00.000Z"),
+      page(4, "Made and edited by me", ME, ME, "2026-11-15T12:04:00.000Z"),
+    ],
+  }
+  const since = { since: "2026-11-15T00:00:00Z" }
+  const titles = async (h: Harness) => (await h.list(since)).events.map((event) => event.title)
+
+  test("another person's page is not listed, and the person's own created or edited page is, each once", async () => {
+    const listed = await titles(harness({}, others))
+    expect(listed).not.toContain("Other's roadmap")
+    expect(listed).toEqual(expect.arrayContaining(["Mine, since edited by other", "Other's, since edited by me", "Made and edited by me", "Q4 planning"]))
+    expect(new Set(listed).size).toBe(listed.length)
+  })
+
+  test("every search carries one author filter for the signed-in user, never none, so no search lists the whole workspace", async () => {
+    const h = harness({}, others)
+    await h.list(since)
+    expect(h.searches.length).toBeGreaterThan(0)
+    for (const input of h.searches) {
+      const filters = input["filters"] as Record<string, unknown>
+      const authors = ["created_by_user_ids", "edited_by_user_ids"].filter((key) => key in filters)
+      expect(authors).toHaveLength(1)
+      expect(filters[authors[0]!]).toEqual(["me"])
+    }
+    expect(new Set(h.searches.map((input) => Object.keys(input["filters"] as object).find((key) => key.endsWith("_by_user_ids"))))).toEqual(new Set(["created_by_user_ids", "edited_by_user_ids"]))
+  })
+
+  test("when the search leaves an author filter out, it says so, and the listing is refused rather than list other people's pages", async () => {
+    const failure = await refusal(harness({ authors: "dropped" }, others).list(since))
+    expect(failure.code).toBe("UNAVAILABLE")
+    expect(failure.what).toContain("who created or edited")
+  })
+
+  test("a page the person never created or edited is not listed, even with no one else's page near it", async () => {
+    const onlyOthers: Fixture = { ...FIXTURE, pages: [page(9, "Other's plan", OTHER, OTHER)], dense: { ...FIXTURE.dense, count: 0 } }
+    expect(await titles(harness({}, onlyOthers))).toEqual([])
+  })
+
+  test("the method's description says exactly what is read: the person's own pages, titles, times and links, never content", () => {
+    const description = eventsMethod(fakeContext(FIXTURE, async () => {})).description
+    expect(description).toContain("that the signed-in person created or edited")
+    expect(description).toContain("no page content")
+    expect(description).not.toContain("of the signed-in workspace")
   })
 })
 

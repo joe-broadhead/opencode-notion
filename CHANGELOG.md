@@ -21,11 +21,20 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- **`notion.pages` lists only pages you created or edited, not every page the sign-in can reach.** Until now
+  `events_list` listed the whole workspace by last edit, other people's documents included. Every search now carries one
+  of Notion's own author filters for your user (`filters.edited_by_user_ids`, then `filters.created_by_user_ids`, each
+  `["me"]`), and a listing is the union of the two, each page once. A page's latest edit may still be someone else's.
+  Notion applies these filters only on the Business and Enterprise plans, as it does the sort; if its search answers
+  with a notice that it left out any option, the listing is `UNAVAILABLE`, never a wider list. One call now makes up to 60
+  searches (30 for each filter), where it made up to 30. The method descriptions, README and architecture guide say
+  exactly what is read. The descriptor has no place for a consent sentence (a `scope` needs at least one key to choose,
+  and this source has none), so `package.json`'s `sources` gains no `scope`.
 - source-contract is pinned at v0.3.0 (`github:we-the-rebel-alliance/source-contract#v0.3.0`), still bundled into
   `dist/index.js` with no runtime dependency. The declaration and both methods are unchanged and carry none of the keys
   v0.3.0 adds (`facts`, `hints`, `routines`, an actor's `kind`, an event's `sections` and `parts`), so jelly, Memory and
   Artifacts on v0.2.x read them as before.
-- No behaviour change beyond the pin, and no host-support change: still tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2, with the supported range unchanged (`>=2.2.3 <2.4.0`).
+- The pin itself changes no behaviour, and no host-support change: still tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2, with the supported range unchanged (`>=2.2.3 <2.4.0`).
 
 ## [0.0.5] - 2026-11-18
 

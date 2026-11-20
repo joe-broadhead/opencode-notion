@@ -71,7 +71,9 @@ for the checks and the release steps.
   `npm run check`.
 - **The pages source.** `src/source.ts` is `notion.pages`, declared in `package.json`'s top-level `sources`: `events_list`
   and `probe`, tools RPC methods only, read through OpenCode's executors for `notion-get-self` and `notion-search` and
-  nothing else, and never page content. `events_list` names the sign-in's workspace and owner from what `probe` or an
+  nothing else, and never page content. `events_list` reads only the signed-in person's own pages: every search carries
+  an author filter (`filters.edited_by_user_ids` or `filters.created_by_user_ids`, `["me"]`), never none, and a notice
+  that Notion omitted an option refuses the listing, since a result carries no author to check. `events_list` names the sign-in's workspace and owner from what `probe` or an
   earlier listing kept for it, else it makes the same `notion-get-self` read itself, once: never make a listing depend on
   a probe in this process, since Memory probes only at bind. `permission.operations` is exactly the tools they read,
   `notion-get-self` is the identity operation, and `permission.readsIdentity` is `true` because a listing asserts it
