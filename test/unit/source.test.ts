@@ -88,30 +88,63 @@ describe("events_list", () => {
     expect(page.gap).toBeUndefined()
   })
 
-  test("asserts its own action, then notion-search, and never reads who is signed in", async () => {
+  test("after a probe recorded the sign-in, asserts its own action, then notion-search, and does not read who is signed in again", async () => {
     const h = harness()
     await h.list({ since: "2026-11-15T00:00:00Z" })
     expect(h.asserted).toEqual([EVENTS_ACTION, "notion_notion-search"])
   })
 
-  test("before a probe has named this sign-in, refuses with UNAVAILABLE and asks for a probe, before any search", async () => {
-    const h = harness({}, FIXTURE, false)
-    const failure = await refusal(h.list({ since: "2026-11-15T00:00:00Z" }))
-    expect(failure).toEqual({
-      code: "UNAVAILABLE",
-      what: "The plugin does not know yet who is signed in to Notion: no probe has named this sign-in's workspace since it was made or OpenCode started",
-      next: "Call probe for the pages source, then call events_list again.",
-    })
-    expect(h.searches).toEqual([])
-    // A probe records the sign-in, and the listing then runs.
-    await h.probe({})
-    expect((await h.list({ since: "2026-11-15T00:00:00Z" })).account).toBe(ACCOUNT)
+  test("after a restart, with no probe yet, a fresh instance reads who is signed in itself, with notion-get-self only, keeps it, and lists", async () => {
+    const known = signIns()
+    const h = harness({ signIns: known }, FIXTURE, false)
+    const page = await h.list({ since: "2026-11-15T00:00:00Z" })
+    expect({ account: page.account, owner: page.owner }).toEqual({ account: ACCOUNT, owner: { id: "notion:5e1d9a2c-3f4b-4a6d-8c7e-1b2a3c4d5e01", label: "Avery Example" } })
+    expect(page.events.map((event) => event.title)).toEqual(["Q4 planning", "Launch tracker", "Weekly sync", "Hiring plan"])
+    // Its own action, then the one declared identity read, then only searches: nothing outside permission.operations.
+    expect(h.asserted[0]).toBe(EVENTS_ACTION)
+    expect(h.asserted[1]).toBe("notion_notion-get-self")
+    expect(new Set(h.asserted.slice(2))).toEqual(new Set(["notion_notion-search"]))
+    expect(known.get("crd_conformance")).toEqual(identityOf(FIXTURE.self)!)
+    // Kept for the process: the next listing asks Notion nothing about who is signed in.
+    h.asserted.length = 0
+    await h.list({ since: "2026-11-15T00:00:00Z" })
+    expect(h.asserted).not.toContain("notion_notion-get-self")
   })
 
-  test("a probe for another sign-in does not stand for this one", async () => {
+  test("with no probe yet, another workspace than the signed-in one is still ACCOUNT_MISMATCH, and nothing is searched", async () => {
+    const h = harness({}, FIXTURE, false)
+    expect(await refusal(h.list({ account: FIXTURE.otherWorkspace }))).toMatchObject({ code: "ACCOUNT_MISMATCH", what: `Notion is signed in to another workspace than ${FIXTURE.otherWorkspace}` })
+    const theirs = encodeBoundCursor({ plugin: "notion", source: SOURCE, account: FIXTURE.otherWorkspace }, { a: FIXTURE.otherWorkspace, t: NOW - 3_600_000, i: "" })
+    expect((await refusal(h.list({ cursor: theirs }))).code).toBe("ACCOUNT_MISMATCH")
+    expect(h.searches).toEqual([])
+  })
+
+  test("a request that is invalid or names another source reads nothing, not even who is signed in, with no probe yet", async () => {
+    const h = harness({}, FIXTURE, false)
+    expect((await refusal(h.list({ limit: 501 }))).code).toBe("INPUT_INVALID")
+    expect((await refusal(h.list({ source: "comments" }))).code).toBe("SOURCE_UNKNOWN")
+    expect(h.asserted).toEqual([EVENTS_ACTION, EVENTS_ACTION])
+    expect(h.searches).toEqual([])
+  })
+
+  test("when notion-get-self fails or names no one, a listing is UNAVAILABLE, searches nothing, keeps nothing, and reads who is signed in again next time", async () => {
     const known = signIns()
-    known.set("crd_other", identityOf(FIXTURE.self)!)
-    expect((await refusal(harness({ signIns: known }, FIXTURE, false).list({}))).code).toBe("UNAVAILABLE")
+    const failing = harness({ signIns: known, fail: { tool: "notion-get-self", message: "internal_error" } }, FIXTURE, false)
+    expect(await refusal(failing.list({}))).toMatchObject({ code: "UNAVAILABLE", what: "Notion's notion-get-self failed: internal_error" })
+    const unnamed = harness({ signIns: known, self: { workspace: { name: "Northwind" } } }, FIXTURE, false)
+    expect((await refusal(unnamed.list({}))).code).toBe("UNAVAILABLE")
+    expect(failing.searches.concat(unnamed.searches)).toEqual([])
+    expect(known.size).toBe(0)
+    expect((await harness({ signIns: known }, FIXTURE, false).list({ since: "2026-11-16T09:00:00Z" })).account).toBe(ACCOUNT)
+  })
+
+  test("a sign-in recorded for another credential does not stand for this one: it reads its own", async () => {
+    const known = signIns()
+    known.set("crd_other", identityOf({ workspace: { id: FIXTURE.otherWorkspace }, user: FIXTURE.self.user })!)
+    const h = harness({ signIns: known }, FIXTURE, false)
+    expect((await h.list({ since: "2026-11-16T09:00:00Z" })).account).toBe(ACCOUNT)
+    expect(h.asserted).toContain("notion_notion-get-self")
+    expect(known.get("crd_other")!.account).toBe(FIXTURE.otherWorkspace)
   })
 
   test("searches every edit since the cursor, sorted by last edit, with no highlight, from the earliest local date", async () => {
@@ -318,13 +351,13 @@ describe("the pages source's declaration", () => {
       tool: "events_list",
       input: { source: SOURCE },
       accounts: { named: false },
-      permission: { events: EVENTS_ACTION, operations: ["notion-get-self", "notion-search"], identity: ["notion-get-self"] },
+      permission: { events: EVENTS_ACTION, operations: ["notion-get-self", "notion-search"], identity: ["notion-get-self"], readsIdentity: true },
       private: true,
       cost: { class: "free" },
       maxBytes: 65_536,
     })
-    // No key a consumer on contract 0.1 refuses.
-    expect("readsIdentity" in item!.permission).toBe(false)
+    // events_list reads notion-get-self itself when it does not know the sign-in, so the descriptor says its content reads assert an identity operation.
+    expect(item!.permission.readsIdentity).toBe(true)
     expect(sources.items).toHaveLength(1)
   })
 

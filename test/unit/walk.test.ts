@@ -41,7 +41,7 @@ async function drain(read: ReturnType<typeof reader>, since: string, limit: numb
   const gaps: { since: number; first: number | undefined }[] = []
   let cursor: string | undefined
   for (let pageNo = 0; pageNo < 500; pageNo++) {
-    const page = await listEvents(read, SIGNED_IN, cursor ? { cursor, limit } : { since, limit }, NOW)
+    const page = await listEvents(read, async () => SIGNED_IN, cursor ? { cursor, limit } : { since, limit }, NOW)
     events.push(...page.events)
     if (page.gap) gaps.push({ since: Date.parse(page.gap.since), first: page.events[0] ? Date.parse(page.events[0].occurred_at) : undefined })
     cursor = page.cursor
@@ -126,12 +126,12 @@ test("polling a busy workspace every quarter hour: no gap while fewer than 50 ed
   let at = NOW - 2 * H
   const read = reader(() => pages.filter((page) => page.t <= at), 0)
   const since = at - 30 * MIN
-  const first = await listEvents(read, SIGNED_IN, { since: new Date(since).toISOString(), limit: 500 }, at)
+  const first = await listEvents(read, async () => SIGNED_IN, { since: new Date(since).toISOString(), limit: 500 }, at)
   expect(first.gap).toBeUndefined()
   const listed = [...first.events]
   let cursor = first.cursor
   for (at += 15 * MIN; at <= NOW; at += 15 * MIN) {
-    const page = await listEvents(read, SIGNED_IN, { cursor, limit: 500 }, at)
+    const page = await listEvents(read, async () => SIGNED_IN, { cursor, limit: 500 }, at)
     expect(page.gap).toBeUndefined()
     listed.push(...page.events)
     cursor = page.cursor

@@ -160,8 +160,10 @@ only and never tools:
   signed-in user, `notion:` and their id, labelled with their name. It records them for the sign-in, OpenCode's credential
   for the server; `watchAccount` clears the record on `credential.switched` or a status that is not connected.
 - `events_list` asserts `notion_events_list` and reads only `notion-search`, with an empty query, `sort: "last_edited"`
-  and `filters.last_edited_date_range`. It never reads who is signed in: it names the workspace and owner probe recorded
-  for the sign-in, and refuses with `UNAVAILABLE` ("call probe") until there is one. Notion runs that sort and that filter
+  and `filters.last_edited_date_range`. It names the workspace and owner of the sign-in: what probe or an earlier listing
+  recorded for it, else it makes the same `notion-get-self` read itself, once, and records it, so it needs no probe
+  before it and survives a restart (a failed read is `UNAVAILABLE`, another workspace `ACCOUNT_MISMATCH`, both before any
+  search). Notion runs that sort and that filter
   only for Business and Enterprise workspaces; on another plan it drops them with a notice, and the source refuses with
   `UNAVAILABLE` rather than list pages in another order. The descriptor has no consent note, so the methods'
   descriptions and the README say so.

@@ -360,23 +360,23 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     expect(value.unclassified).toEqual([NEW_TOOL.name])
   })
 
+  // The first call this stock OpenCode process makes to the source, with no probe before it, as after a restart.
+  test("events_list with no probe yet reads who is signed in itself, then only notion-search, and refuses a search answer it cannot read with the contract's code", async () => {
+    const from = fake.calls.length
+    const result = await call("build", "events_list", {})
+    expect({ code: result.code, message: result.message }).toEqual({ code: "UNAVAILABLE", message: expect.stringContaining("notion-search answered no results list") })
+    expect(toolCalls(from)).toEqual(["notion-get-self", "notion-search"])
+    // A session whose agent denies Notion is refused before Notion is called.
+    const locked = fake.calls.length
+    expect((await call("locked", "events_list", {})).code).toBe("PERMISSION_DENIED")
+    expect(toolCalls(locked)).toEqual([])
+  })
+
   test("probe names the workspace and the signed-in user from one notion-get-self read, as the session's agent", async () => {
     const from = fake.calls.length
     const { value } = await call("build", "probe", {})
     expect(value).toEqual({ source: "pages", account: SELF.workspace.id, owner: { id: `notion:${SELF.user.id}`, label: SELF.user.name }, trust: "untrusted" })
     expect(toolCalls(from)).toEqual(["notion-get-self"])
-  })
-
-  test("events_list reads only notion-search, for the sign-in probe named, and refuses a search answer it cannot read with the contract's code", async () => {
-    await call("build", "probe", {})
-    const from = fake.calls.length
-    const result = await call("build", "events_list", {})
-    expect({ code: result.code, message: result.message }).toEqual({ code: "UNAVAILABLE", message: expect.stringContaining("notion-search answered no results list") })
-    expect(toolCalls(from)).toEqual(["notion-search"])
-    // A session whose agent denies Notion is refused before Notion is called.
-    const locked = fake.calls.length
-    expect((await call("locked", "events_list", {})).code).toBe("PERMISSION_DENIED")
-    expect(toolCalls(locked)).toEqual([])
   })
 
   test("runs a known read as the session's agent, with no model turn", async () => {

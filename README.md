@@ -127,8 +127,9 @@ that are never tools the model sees.
 - `events_list` lists the workspace's pages and databases by the time they were last edited, oldest first, from a cursor
   or a `since`. One event is one page at one edit time: its title, the edit time to the minute, a link to the page, and
   `page` or `database`. It reads only `notion-search`, with an empty query sorted by last edit, and names the workspace
-  and owner probe recorded: until a probe has, after a new sign-in or after OpenCode starts, it refuses with
-  `UNAVAILABLE` and asks for one.
+  and owner of the sign-in: what `probe` or an earlier listing kept for it, else it makes the same `notion-get-self`
+  read itself, once, so it needs no `probe` before it and works after a restart of OpenCode. If Notion cannot answer that
+  read it refuses with `UNAVAILABLE`, and another workspace than the signed-in one is `ACCOUNT_MISMATCH`.
 
 **It needs a Business or Enterprise workspace.** Probing and binding the source work on any plan, but on a lower one every
 `events_list` read is refused, because only those plans sort Notion's search by last edit. The source contract has no

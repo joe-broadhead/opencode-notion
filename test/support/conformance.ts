@@ -43,14 +43,13 @@ export async function conformanceReports(fixture: Fixture = FIXTURE): Promise<Co
   const sources = declaredSources()
   const account = fixture.self.workspace.id
   const now = Date.parse(fixture.now)
-  // What probe records, for the one sign-in: a listing names its workspace and owner, as the plugin does.
+  // What the plugin keeps for the one sign-in: nothing at the start, as after a restart. No probe runs first, so the kit's
+  // first listing reads who is signed in itself, as a consumer's collection does after a restart.
   const known = signIns()
   const methods = (session: Pick<SessionContext, "permission">) => {
     const ctx = fakeContext(fixture, async (input) => session.permission.assert(input), { signIns: known })
     return { events: eventsMethod(ctx, () => now), probe: probeMethod(ctx) }
   }
-  // A consumer probes at bind: the plugin then knows who the sign-in is, and a listing for that workspace runs.
-  await methods({ permission: { assert: async () => {} } }).probe.run({ source: SOURCE }, call())
   const reports: ConformanceReport[] = []
   for (const source of sources.items) {
     reports.push(

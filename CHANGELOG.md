@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Fixed
+
+- **`events_list` works after any restart of OpenCode, with no `probe` before it.** Until now the plugin kept who is
+  signed in only in memory, and only `probe` filled it. A consumer that probes once, at bind, such as Memory, found
+  every later listing `UNAVAILABLE` ("no probe has named this sign-in's workspace") after OpenCode started again, a
+  plugin reload, or a second OpenCode process, for good. Now a listing that does not know the sign-in yet makes the one
+  identity read `probe` makes (`notion-get-self`, the declared identity operation), once, keeps the answer for the
+  sign-in as `probe` does, and then runs. The workspace check is as strict as before: another workspace than the
+  signed-in one is `ACCOUNT_MISMATCH`, before any search. An identity read that fails, or answers without a workspace and
+  user, is `UNAVAILABLE`, and nothing is kept. An invalid request or another source is still refused before any read.
+- **`package.json`'s `sources` now declares `permission.readsIdentity: true` for `notion.pages`**, because a listing
+  asserts `notion-get-self`, as the source contract's conformance kit requires. Memory reads this key (contract v0.2.0
+  and later); a consumer on contract v0.1.0 refuses a descriptor that carries it. `probe`, the declared operations and the
+  other grants are unchanged.
+
 ### Changed
 
 - source-contract is pinned at v0.3.0 (`github:we-the-rebel-alliance/source-contract#v0.3.0`), still bundled into

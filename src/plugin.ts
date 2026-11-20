@@ -109,7 +109,7 @@ export function createNotionPlugin(seam: NotionSeam) {
       await registerDefaultRules(ctx.agent, defaultRules(options.access), report("rules"))
       // The workspace name and connection type come from the model's own notion-get-self calls, never from a call of
       // the plugin's; the watcher also notes when the server last changed status.
-      // What probe read for each sign-in; forgotten with the account rows on a sign-out or another account.
+      // Who each sign-in is, as probe or a listing read it; forgotten with the account rows on a sign-out or another account.
       const known = signIns()
       const account = await watchAccount(ctx, () => source?.type === "adopted" && source.signIn === "own", owned, () => known.clear())
       const own = skills.map((skill) => ({ id: skill.id, path: skill.path }))
@@ -120,7 +120,7 @@ export function createNotionPlugin(seam: NotionSeam) {
       // Scripts call the known reads with no model, as a session and its agent.
       // events_list and probe are the plugin's own reads, the pages source's (package.json's `sources`): they read
       // through OpenCode's executors for Notion's tools, as the calling session. The sign-in is OpenCode's credential
-      // for the server: probe records who it is, and a listing names that workspace and owner.
+      // for the server: probe or a listing records who it is, and a listing names that workspace and owner.
       const signIn = async () => {
         const server = (await ctx.mcp.list()).data.find((entry) => entry.name === SERVER_NAME)
         const connection = server?.integrationID ? await ctx.integration.connection.active(server.integrationID) : undefined
