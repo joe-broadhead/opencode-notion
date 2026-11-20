@@ -8,7 +8,7 @@ import { resultProblems, SourceError, type EventsListResult } from "@we-the-rebe
 import { pluginError } from "../../src/host/tools-rpc.js"
 import { PLUGIN_METHODS } from "../../src/notion-tools.js"
 import { defaultRules, type Access } from "../../src/permissions.js"
-import { EVENTS_ACTION, MAX_SEARCHES, PROBE_ACTION, SEARCH_PAGE, SOURCE, SOURCE_ID, URL_HOSTS, eventsMethod, identityOf, notionUrl, probeMethod, readSearch, signIns } from "../../src/source.js"
+import { EVENTS_ACTION, MAX_SEARCHES, PROBE_ACTION, SEARCH_PAGE, SOURCE, SOURCE_ID, URL_HOSTS, eventsMethod, identityOf, notionUrl, probeMethod, readSearch, signIns, type SignIns } from "../../src/source.js"
 import { conformanceReports, declaredSources } from "../support/conformance.js"
 import { FIXTURE, ROOT, call, fakeContext, pagesOf, type FakeOptions, type Fixture } from "../support/fake-notion.js"
 
@@ -18,6 +18,8 @@ const ACCOUNT = FIXTURE.self.workspace.id
 interface Harness {
   readonly asserted: string[]
   readonly searches: Record<string, unknown>[]
+  /** What the plugin keeps for the sign-in, as a credential event clears it. */
+  readonly known: SignIns
   list(input: Record<string, unknown>, now?: number): Promise<EventsListResult>
   probe(input: Record<string, unknown>): Promise<unknown>
 }
@@ -32,6 +34,7 @@ function harness(options: FakeOptions = {}, fixture: Fixture = FIXTURE, probed =
   return {
     asserted,
     searches,
+    known,
     list: (input, now = NOW) => eventsMethod(ctx, () => now).run(input, call()) as Promise<EventsListResult>,
     probe: (input) => probeMethod(ctx).run(input, call()),
   }
@@ -335,7 +338,7 @@ describe("events_list reads only the signed-in person's own pages", () => {
   const since = { since: "2026-11-15T00:00:00Z" }
   const titles = async (h: Harness) => (await h.list(since)).events.map((event) => event.title)
 
-  test("another person's page is not listed, and the person's own created or edited page is, each once", async () => {
+  test("a page neither author filter returns is not listed, and a page either filter returns is, each once", async () => {
     const listed = await titles(harness({}, others))
     expect(listed).not.toContain("Other's roadmap")
     expect(listed).toEqual(expect.arrayContaining(["Mine, since edited by other", "Other's, since edited by me", "Made and edited by me", "Q4 planning"]))
@@ -358,7 +361,7 @@ describe("events_list reads only the signed-in person's own pages", () => {
   test("when the search leaves an author filter out, it says so, and the listing is refused rather than list other people's pages", async () => {
     const failure = await refusal(harness({ authors: "dropped" }, others).list(since))
     expect(failure.code).toBe("UNAVAILABLE")
-    expect(failure.what).toContain("who created or edited")
+    expect(failure.what).toContain("creator or editor")
   })
 
   test("a page the person never created or edited is not listed, even with no one else's page near it", async () => {
@@ -366,11 +369,92 @@ describe("events_list reads only the signed-in person's own pages", () => {
     expect(await titles(harness({}, onlyOthers))).toEqual([])
   })
 
-  test("the method's description says exactly what is read: the person's own pages, titles, times and links, never content", () => {
+  test("the method's description says exactly what is read: what the two filters return, titles, times and links, never content", () => {
     const description = eventsMethod(fakeContext(FIXTURE, async () => {})).description
-    expect(description).toContain("that the signed-in person created or edited")
+    expect(description).toContain("pages and databases you created")
+    expect(description).toContain("edited_by_user_ids with your id")
     expect(description).toContain("no page content")
     expect(description).not.toContain("of the signed-in workspace")
+    // It never claims that the person made the latest edit, which Notion's filter does not say.
+    expect(description).not.toContain("you edited")
+  })
+})
+
+
+describe("events_list's identity read", () => {
+  const since = { since: "2026-11-15T00:00:00Z" }
+  const identityReads = (h: Harness) => h.asserted.filter((action) => action === "notion_notion-get-self").length
+
+  test("two listings that start together, with no probe, share one notion-get-self read", async () => {
+    const h = harness({}, FIXTURE, false)
+    const [first, second] = await Promise.all([h.list(since), h.list(since)])
+    expect([first.account, second.account]).toEqual([ACCOUNT, ACCOUNT])
+    expect(identityReads(h)).toBe(1)
+    expect(h.known.size).toBe(1)
+  })
+
+  test("an identity read in flight when the sign-in is cleared keeps nothing, and refuses rather than label a page", async () => {
+    let release = () => {}
+    const until = new Promise<void>((resolve) => (release = resolve))
+    const h = harness({ hold: { tool: "notion-get-self", until } }, FIXTURE, false)
+    const listing = h.list(since)
+    // The listing is now waiting on notion-get-self; a credential event clears what was kept meanwhile.
+    await Bun.sleep(10)
+    expect(h.known.size).toBe(0)
+    h.known.clear()
+    release()
+    expect((await refusal(listing)).code).toBe("UNAVAILABLE")
+    expect(h.known.size).toBe(0)
+    // The next listing reads who is signed in again, and lists.
+    expect((await h.list({ since: "2026-11-16T09:00:00Z" })).account).toBe(ACCOUNT)
+    expect(identityReads(h)).toBe(2)
+  })
+})
+
+
+describe("events_list when Notion rate limits a search", () => {
+  // One edit a day for sixty days: the first search lists fifty, the walk reads on in days, and no day holds a hole.
+  const start = Date.parse("2026-09-01T00:00:00Z")
+  const daily: Fixture = {
+    ...FIXTURE,
+    pages: Array.from({ length: 60 }, (_, index) => ({
+      id: `5e5e5e5e-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      type: "page" as const,
+      title: `Daily ${index}`,
+      edited: new Date(start + index * 86_400_000).toISOString(),
+    })),
+    dense: { ...FIXTURE.dense, count: 0 },
+  }
+  const input = { since: "2026-09-01T00:00:00Z", limit: 50 }
+  const ids = (page: EventsListResult) => page.events.map((event) => event.external_id)
+  const limited = 'rate_limited {"retry_after_seconds": 30}'
+
+  test("answers what it listed, with its own cursor back and more, makes no search after the limit, and skips nothing", async () => {
+    const all = new Set((await readAll(harness({}, daily), input)).flatMap(ids))
+    expect(all.size).toBe(60)
+    const h = harness({ failSearchAt: { at: 2, message: limited } }, daily)
+    const first = await h.list(input)
+    expect(first.events).toHaveLength(50)
+    expect(first.more).toBe(true)
+    expect(first.gap).toBeUndefined()
+    // The limit ended the call's searches: the failed one is the last, and the created-by walk made none.
+    expect(h.searches).toHaveLength(2)
+    // Its cursor is the one it was given, so the next call reads the unread window again rather than skip it.
+    expect(JSON.parse(Buffer.from(first.cursor, "base64url").toString("utf8")).t).toBe(Date.parse(input.since))
+    const seen = new Set(ids(first))
+    let page = first
+    while (page.more) {
+      page = await h.list({ cursor: page.cursor, limit: 50 })
+      for (const id of ids(page)) seen.add(id)
+    }
+    expect(seen.size).toBe(60)
+  })
+
+  test("a limit before anything was read is RATE_LIMITED, with Notion's retry-after and nothing kept", async () => {
+    const h = harness({ failSearchAt: { at: 1, message: limited } }, daily)
+    const failure = await refusal(h.list(input))
+    expect(failure).toMatchObject({ code: "RATE_LIMITED" })
+    expect(h.searches).toHaveLength(1)
   })
 })
 
@@ -420,13 +504,13 @@ describe("the pages source's declaration", () => {
       tool: "events_list",
       input: { source: SOURCE },
       accounts: { named: false },
-      permission: { events: EVENTS_ACTION, operations: ["notion-get-self", "notion-search"], identity: ["notion-get-self"], readsIdentity: true },
+      permission: { events: EVENTS_ACTION, operations: ["notion-get-self", "notion-search"], identity: ["notion-get-self"] },
       private: true,
       cost: { class: "free" },
       maxBytes: 65_536,
     })
-    // events_list reads notion-get-self itself when it does not know the sign-in, so the descriptor says its content reads assert an identity operation.
-    expect(item!.permission.readsIdentity).toBe(true)
+    // No key a consumer on source-contract 0.1 refuses.
+    expect("readsIdentity" in item!.permission).toBe(false)
     expect(sources.items).toHaveLength(1)
   })
 

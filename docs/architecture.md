@@ -162,7 +162,8 @@ only and never tools:
 - `events_list` asserts `notion_events_list` and reads only `notion-search`, with an empty query, `sort: "last_edited"`,
   `filters.last_edited_date_range` and one author filter for the signed-in user (`filters.edited_by_user_ids`, then
   `filters.created_by_user_ids`, each `["me"]`): it walks once with each and lists the union, each page once, so only
-  pages the person created or edited are read. It names the workspace and owner of the sign-in: what probe or an earlier listing
+  the pages those filters return are read. Notion's documentation does not say which edits `edited_by_user_ids` matches,
+  so a listed page's latest edit may be someone else's; nothing more is claimed. It names the workspace and owner of the sign-in: what probe or an earlier listing
   recorded for it, else it makes the same `notion-get-self` read itself, once, and records it, so it needs no probe
   before it and survives a restart (a failed read is `UNAVAILABLE`, another workspace `ACCOUNT_MISMATCH`, both before any
   search). Notion runs that sort and those filters

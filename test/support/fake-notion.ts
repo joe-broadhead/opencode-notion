@@ -22,7 +22,7 @@ export interface FakePage {
   readonly edited: string
   /** The user who created it; the signed-in user when left out. */
   readonly createdBy?: string
-  /** The user who last edited it; the signed-in user when left out. */
+  /** A user `filters.edited_by_user_ids` matches for this page; the signed-in user when left out. Notion does not say which edits it matches. */
   readonly editedBy?: string
 }
 
@@ -57,6 +57,10 @@ export interface FakeOptions {
   readonly status?: "connected" | "needs_auth" | "failed"
   /** A Notion failure for this tool, as OpenCode's executor raises it. */
   readonly fail?: { readonly tool: string; readonly message: string }
+  /** A Notion failure on this notion-search attempt (1-based, counted from the context's first), once. */
+  readonly failSearchAt?: { readonly at: number; readonly message: string }
+  /** Holds this tool's answer until `until` resolves, so a test can interleave two calls. */
+  readonly hold?: { readonly tool: string; readonly until: Promise<void> }
   /** `dropped`: the search leaves the created-by and edited-by filters out and says so in `notices`, as it does for an option the plan lacks. */
   readonly authors?: "applied" | "dropped"
   /** Another notion-get-self answer. */
@@ -127,10 +131,13 @@ type Assert = (input: { readonly action: string; readonly resources: readonly st
 /** The plugin context the source reads through: Notion's two tools, the server's state, and the caller's permission. */
 export function fakeContext(fixture: Fixture, assert: Assert, options: FakeOptions = {}) {
   const pages = options.pages ?? (() => pagesOf(fixture))
+  let searches = 0
   const answers: Record<string, (input: Record<string, unknown>) => unknown> = {
     "notion-get-self": () => options.self ?? fixture.self,
     "notion-search": (input) => {
       options.searches?.push(input)
+      searches += 1
+      if (options.failSearchAt?.at === searches) throw toolError(options.failSearchAt.message)
       return searchAnswer(pages(), input, options.plan, options.zone, fixture.self.user["id"] ?? "", options.authors)
     },
   }
@@ -140,6 +147,7 @@ export function fakeContext(fixture: Fixture, assert: Assert, options: FakeOptio
     execute: async (input: Record<string, unknown>) => {
       // OpenCode's executor asserts the tool's own action before it calls Notion.
       await assert({ action: `notion_${name}`, resources: ["*"] })
+      if (options.hold?.tool === name) await options.hold.until
       if (options.fail?.tool === name) throw toolError(options.fail.message)
       return { content: [{ type: "text", text: JSON.stringify(answer(input)) }] }
     },

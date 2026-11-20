@@ -43,13 +43,16 @@ export async function conformanceReports(fixture: Fixture = FIXTURE): Promise<Co
   const sources = declaredSources()
   const account = fixture.self.workspace.id
   const now = Date.parse(fixture.now)
-  // What the plugin keeps for the one sign-in: nothing at the start, as after a restart. No probe runs first, so the kit's
-  // first listing reads who is signed in itself, as a consumer's collection does after a restart.
+  // What probe records, for the one sign-in: a listing names that workspace and owner and asserts no identity operation.
   const known = signIns()
   const methods = (session: Pick<SessionContext, "permission">) => {
     const ctx = fakeContext(fixture, async (input) => session.permission.assert(input), { signIns: known })
     return { events: eventsMethod(ctx, () => now), probe: probeMethod(ctx) }
   }
+  // The descriptor sends no `readsIdentity` (a contract 0.1 consumer refuses it), so the kit's session probes first, as a
+  // consumer does at bind: every listing then finds who the sign-in is. After a restart with no probe, a listing reads it
+  // itself; test/unit/source.test.ts covers that case.
+  await methods({ permission: { assert: async () => {} } }).probe.run({ source: SOURCE }, call())
   const reports: ConformanceReport[] = []
   for (const source of sources.items) {
     reports.push(

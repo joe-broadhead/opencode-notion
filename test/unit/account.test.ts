@@ -45,6 +45,8 @@ function fake() {
   const disposed: string[] = []
   let push: (() => void) | undefined
   let next: { type: string; data: Record<string, unknown> } = { type: "mcp.status.changed", data: { server: "notion" } }
+  /** The event types the watcher asked for: a real host delivers only those. */
+  const subscribed: string[] = []
   const ctx = {
     tool: {
       hook: async (name: string, handler: (event: unknown) => Promise<void>) => {
@@ -54,7 +56,9 @@ function fake() {
     },
     mcp: { list: async () => ({ data: [{ name: "notion", status: { status: "needs_auth" } }] }) },
     event: {
-      subscribe: ({ signal }: { signal: AbortSignal }) => ({
+      subscribe: ({ signal, types }: { signal: AbortSignal; types: readonly string[] }) => {
+        subscribed.push(...types)
+        return {
         async *[Symbol.asyncIterator]() {
           while (!signal.aborted) {
             await new Promise<void>((resolve) => {
@@ -64,13 +68,15 @@ function fake() {
             if (!signal.aborted) yield next
           }
         },
-      }),
+        }
+      },
     },
   }
   return {
     ctx,
     handlers,
     disposed,
+    subscribed,
     /** Emits the event `next` was set to. */
     emit: (event?: { type: string; data: Record<string, unknown> }) => {
       if (event) next = event
@@ -122,6 +128,29 @@ describe("watchAccount", () => {
     view.emit({ type: "credential.switched", data: {} })
     await view.settle()
     expect(account.signedIn()).toBe(false)
+    await account.stop()
+  })
+
+  // A new sign-in may keep its credential id and be another person or workspace, so an update forgets what was read too.
+  test("forgets what was read on a credential update as on a switch, and asks the host for both events", async () => {
+    const view = fake()
+    let forgotten = 0
+    const account = await watchAccount(view.ctx as never, () => true, () => true, () => void forgotten++)
+    await view.handlers.get("execute.after")!({ tool: "notion_notion-get-self", status: "completed", result: { output: SELF } })
+    expect(account.current()).toEqual({ workspace: "Acme Robotics", connection: "person" })
+    expect(view.subscribed).toContain("credential.updated")
+    view.emit({ type: "credential.updated", data: {} })
+    await view.settle()
+    expect(forgotten).toBe(1)
+    expect(account.current()).toBeUndefined()
+    expect(account.signedIn()).toBe(false)
+    view.emit({ type: "credential.switched", data: {} })
+    await view.settle()
+    expect(forgotten).toBe(2)
+    // Nothing else forgets it.
+    view.emit({ type: "integration.updated", data: {} })
+    await view.settle()
+    expect(forgotten).toBe(2)
     await account.stop()
   })
 })
