@@ -126,7 +126,7 @@ export function createNotionPlugin(seam: NotionSeam) {
         const connection = server?.integrationID ? await ctx.integration.connection.active(server.integrationID) : undefined
         return connection?.type === "credential" ? connection.id : undefined
       }
-      const pages = { tool: ctx.tool, mcp: ctx.mcp, permission: ctx.permission, signIn, signIns: known }
+      const pages = { tool: ctx.tool, mcp: ctx.mcp, permission: ctx.permission, owned, signIn, signIns: known }
       const stopTools = await registerToolsRpc(ctx as never, {
         plugin: PLUGIN,
         methods: [...METHODS, eventsMethod(pages), probeMethod(pages)],
