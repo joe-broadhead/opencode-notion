@@ -357,6 +357,8 @@ export interface SourceContext {
   readonly tool: Pick<Plugin.Context["tool"], "list">
   readonly mcp: Pick<Plugin.Context["mcp"], "list">
   readonly permission: Pick<Plugin.Context["permission"], "assert">
+  /** False while `notion` is a server of the user's at another URL, which is not Notion's. */
+  readonly owned: () => boolean
   /** The sign-in a call runs under: OpenCode's credential id for the server, or undefined without one. */
   readonly signIn: () => Promise<string | undefined>
   readonly signIns: SignIns
@@ -367,19 +369,28 @@ export interface SourceContext {
  * listed is the server's connection state or a connection without it; Notion's own failure is UNAVAILABLE or
  * RATE_LIMITED, naming `method`; a permission refusal passes through unchanged.
  */
-export function notionReader(ctx: Pick<SourceContext, "tool" | "mcp">, context: ToolContext, method: string): Read {
+export function notionReader(ctx: Pick<SourceContext, "tool" | "mcp">, context: ToolContext, method: string, owned: () => void = () => {}): Read {
   let tools: readonly HostTool[] | undefined
   return async (name, input) => {
     context.signal.throwIfAborted()
+    owned()
     tools ??= await ctx.tool.list()
+    owned()
     const tool = tools.find((entry) => entry.id === `${SERVER_NAME}_${name}`)
     if (!tool) {
       const state = (await ctx.mcp.list()).data.find((entry) => entry.name === SERVER_NAME)?.status
+      owned()
       throw connectionFailure(state?.status, name)
     }
+    owned()
     try {
-      return await tool.execute(input as never, context)
+      const result = await tool.execute(input as never, context)
+      owned()
+      return result
     } catch (error) {
+      // Recheck before consuming a rejected executor: a conflict during the call must not become an ordinary error or
+      // leave a warm identity cache behind.
+      owned()
       if (error instanceof Error && error.message.startsWith(`MCP server "${SERVER_NAME}" `)) {
         const state = (await ctx.mcp.list()).data.find((entry) => entry.name === SERVER_NAME)?.status
         throw connectionFailure(state?.status === "connected" ? "pending" : state?.status, name)
@@ -824,6 +835,17 @@ const signInOf = async (ctx: SourceContext) => (await ctx.signIn().catch(() => u
 const signInChanged = () =>
   failure("UNAVAILABLE", "The Notion sign-in changed while the plugin was reading who is signed in", "Call events_list again; if it keeps failing, run /notion-status.")
 
+/** The `notion` name in this project belongs to a server the plugin does not manage: no source read may call it. */
+const serverConflict = () =>
+  failure("UNAVAILABLE", "The notion MCP server in this project is not Notion's, so this source does not call it.", "Run /notion-status and point your own mcp.servers.notion at Notion's URL or remove it, then call the method again.")
+
+/** Refuse a conflict at every observed dispatch boundary, and make the identity cache unusable for a later call. */
+const assertOwned = (ctx: SourceContext) => {
+  if (ctx.owned()) return
+  ctx.signIns.clear()
+  throw serverConflict()
+}
+
 /**
  * Who the current sign-in is: what an earlier probe or listing kept for it, else read now with `notion-get-self`, the
  * source's identity operation, and kept for the process. Listings that start together share one read, and a read that
@@ -839,16 +861,41 @@ async function signedInFor(ctx: SourceContext, read: Read): Promise<Identity> {
 
 /** events_list's one run: asserts notion_events_list for the caller, then lists for the sign-in, which it reads itself when none is kept. */
 export async function runEvents(ctx: SourceContext, input: unknown, context: ToolContext, now: () => number = Date.now): Promise<EventsListResult> {
-  await assertAction(ctx, EVENTS_ACTION, context)
-  const read = notionReader(ctx, context, EVENTS_LIST)
-  return listEvents(read, () => signedInFor(ctx, read), input, now())
+  assertOwned(ctx)
+  try {
+    await assertAction(ctx, EVENTS_ACTION, context)
+    assertOwned(ctx)
+    const read = notionReader(ctx, context, EVENTS_LIST, () => assertOwned(ctx))
+    const result = await listEvents(read, () => signedInFor(ctx, read), input, now())
+    assertOwned(ctx)
+    return result
+  } catch (error) {
+    // A permission/discovery rejection can bypass the final check; if ownership changed, conflict wins and the cache
+    // is cleared. When managed, the ordinary error is preserved.
+    assertOwned(ctx)
+    throw error
+  }
 }
 
 /** probe's one run: asserts notion_probe for the caller, then reads who is signed in and records it for this sign-in. */
 export async function runProbe(ctx: SourceContext, input: unknown, context: ToolContext): Promise<ProbeResult> {
-  await assertAction(ctx, PROBE_ACTION, context)
-  const signIn = await signInOf(ctx)
-  return notionProbe(notionReader(ctx, context, PROBE), input, (identity) => void ctx.signIns.set(signIn, identity))
+  assertOwned(ctx)
+  try {
+    await assertAction(ctx, PROBE_ACTION, context)
+    assertOwned(ctx)
+    const signIn = await signInOf(ctx)
+    const generation = ctx.signIns.generation
+    let identity: Identity | undefined
+    const result = await notionProbe(notionReader(ctx, context, PROBE, () => assertOwned(ctx)), input, (found) => {
+      identity = found
+    })
+    assertOwned(ctx)
+    if (generation === ctx.signIns.generation && identity !== undefined) ctx.signIns.set(signIn, identity)
+    return result
+  } catch (error) {
+    assertOwned(ctx)
+    throw error
+  }
 }
 
 /** The tools RPC's events_list method, run as the envelope's session. */

@@ -119,7 +119,9 @@ See [Scripting](https://github.com/joe-broadhead/opencode-notion/blob/HEAD/docs/
 
 The plugin is also a source of the [source contract](https://github.com/we-the-rebel-alliance/source-contract):
 `package.json` declares `notion.pages`, which Memory and other consumers read through the same tools RPC, with two methods
-that are never tools the model sees.
+that are never tools the model sees. Neither method calls a `notion` server the plugin does not manage: a conflicting
+entry is refused at entry, after permission, after tool discovery and before execute, and whatever identity was kept is
+cleared.
 
 - `probe` reads `notion-get-self` and answers who is signed in: the account is the workspace's id, and the owner is the
   signed-in user, `notion:` and their id, labelled with their name. The plugin keeps that for the sign-in, in memory,

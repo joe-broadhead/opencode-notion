@@ -71,6 +71,8 @@ export interface FakeOptions {
   readonly zone?: number
   /** What probe recorded per sign-in; a new, empty record by default. */
   readonly signIns?: SignIns
+  /** False while the `notion` server name belongs to a server the plugin does not manage. */
+  readonly owned?: () => boolean
   /** The pages, instead of the fixture's; read at each search, so a test can change them between calls. */
   readonly pages?: () => readonly FakePage[]
 }
@@ -156,6 +158,7 @@ export function fakeContext(fixture: Fixture, assert: Assert, options: FakeOptio
     tool: { list: async () => (status === "connected" ? tools : []) as never },
     mcp: { list: async () => ({ data: [{ name: "notion", status: { status } }] }) as never },
     permission: { assert: async (input: { action: string; resources: readonly string[] }) => assert({ action: input.action, resources: [...input.resources] }) },
+    owned: options.owned ?? (() => true),
     signIn: async () => "crd_conformance",
     signIns: options.signIns ?? signIns(),
   }

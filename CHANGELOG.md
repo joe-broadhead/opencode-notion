@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- **The source methods refuse a conflicting `notion` server at every observed dispatch boundary.** `events_list` and
+  `probe` check that the `notion` server is the plugin's or an adopted Notion entry at entry, after the permission
+  assert, after tool discovery and immediately before execute. A conflict clears the identity cache and returns
+  `UNAVAILABLE`, so a result or a later call cannot reuse an identity from the unmanaged server. The descriptor bytes
+  and permission lists are unchanged.
 - **`events_list` works after any restart of OpenCode, with no `probe` before it.** Until now the plugin kept who is
   signed in only in memory, and only `probe` filled it. A consumer that probes once, at bind, such as Memory, found
   every later listing `UNAVAILABLE` ("no probe has named this sign-in's workspace") after OpenCode started again, a
