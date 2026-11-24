@@ -1,8 +1,8 @@
 ---
 name: notion
-description: Load before the first Notion tool call (notion_*, tools["notion"]). For the user's Notion workspace - a page, doc, spec, brief or wiki page, searching Notion for where something was written or decided, a database table such as a tracker, content calendar or project list, page comments and suggested edits, page history and backlinks, files on a page, Notion AI meeting notes, and Notion sign-in. Not for Google Docs, Drive, Gmail or Google Calendar (Google Workspace), Slack messages, GitHub code, Linear issues, Jira or Confluence (jira), or a recorded meeting (Granola or Wispr Flow).
+description: "The user's Notion workspace: pages, docs, wikis, databases and trackers, comments and suggested edits, history and backlinks, files, Notion AI meeting notes, and sign-in. Not for Google Docs or Calendar (gws), recorded meetings (granola), or remembering things (Memory)."
 ---
-If Notion's tools are absent, run `/connect` and choose Notion, or on Jelly call jelly_connection_request. An Enterprise admin may need to approve OpenCode first.
+If Notion's tools are absent, run `/connect` and choose Notion. An Enterprise admin may need to approve OpenCode first.
 # Notion
 
 The MCP server is `notion`, and every tool name already starts `notion-`, so a call is `notion_notion-search` or, in
@@ -95,4 +95,4 @@ apps to an approved list.
 Scripts run the reads through the tools RPC `notion.workspace.tools`, one call at a time, as a session made for them
 (`opencode api post /api/session -d '{"title":"…","agent":"build","location":{"directory":"/path/to/project"}}'`, keep `data.id`). Never borrow an existing session
 found through history or a list.
-https://raw.githubusercontent.com/joe-broadhead/opencode-notion/HEAD/docs/scripting.md
+https://raw.githubusercontent.com/we-the-rebel-alliance/notion-plugin/master/docs/scripting.md
