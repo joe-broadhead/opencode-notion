@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { encodeBoundCursor } from "@we-the-rebel-alliance/source-contract/cursor"
+import { encodeBoundCursor, encodeCursor } from "@we-the-rebel-alliance/source-contract/cursor"
 import { resultProblems, SourceError, type EventsListResult } from "@we-the-rebel-alliance/source-contract/events"
 import { pluginError } from "../../src/host/tools-rpc.js"
 import { PLUGIN_METHODS } from "../../src/notion-tools.js"
@@ -84,7 +84,7 @@ describe("events_list", () => {
     })
     expect(page.events[1]!.labels).toEqual(["database"])
     expect(page.owner).toEqual({ id: "notion:5e1d9a2c-3f4b-4a6d-8c7e-1b2a3c4d5e01", label: "Avery Example" })
-    expect(page).toMatchObject({ source: SOURCE, account: ACCOUNT, more: false, trust: "untrusted", plugin: "@joe-broadhead/opencode-notion", asOf: FIXTURE.now })
+    expect(page).toMatchObject({ source: SOURCE, account: ACCOUNT, more: false, trust: "untrusted", plugin: "@we-the-rebel-alliance/notion-plugin", asOf: FIXTURE.now })
     // A title that holds a secret is refused for good, and named without its words.
     expect(page.refused).toEqual([{ external_id: "1a2b3c4d-0000-4000-8000-000000000003@2026-11-15T11:40:00.000Z", reason: "secret", detail: "holds a secret (token)" }])
     expect(JSON.stringify(page)).not.toContain("ghp_")
@@ -245,6 +245,8 @@ describe("events_list", () => {
       [encodeBoundCursor({ plugin: "granola", source: SOURCE, account: ACCOUNT }, { a: ACCOUNT, t, i: "" }), "CURSOR_INVALID"],
       [encodeBoundCursor({ plugin: "notion", source: SOURCE, account: ACCOUNT }, { a: ACCOUNT, t: "soon", i: "" }), "CURSOR_INVALID"],
       ["not-a-cursor", "CURSOR_INVALID"],
+      // Contract 1's cursor for this source and workspace: only the current bound cursor is accepted.
+      [encodeCursor(SOURCE, { a: ACCOUNT, t, i: "" }), "CURSOR_INVALID"],
     ]
     for (const [cursor, code] of cases) expect({ cursor: cursor.slice(0, 12), code: (await refusal(harness().list({ cursor }))).code }).toEqual({ cursor: cursor.slice(0, 12), code })
   })

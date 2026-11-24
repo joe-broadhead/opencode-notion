@@ -36,14 +36,14 @@ export const METHODS: readonly MethodSpec[] = [
   ...DESTRUCTIVE_TOOLS.map((name): MethodSpec => ({ kind: "mcp", name, class: "destructive" })),
 ]
 
-/** What the model path's `execute.before` hooks do to an MCP call's arguments. Notion has no such hook. */
+/** The tools RPC's argument shaping. Notion changes no argument. */
 export function shapeInput(_method: string, input: unknown, _call: ShapeCall): unknown {
   return input
 }
 
 /**
- * What the model path's `execute.after` hook does to a result, which the executor skips: the account read records the
- * workspace's name and connection type that status shows, with the hook's own function. The result itself is unchanged.
+ * The tools RPC's result shaping: a script's `notion-get-self` call records the workspace's name and connection type
+ * that status shows. The result itself is unchanged. No `execute.after` hook is registered for the model path.
  */
 export function shapeResult(method: string, result: McpResult, _call: ShapeCall): McpResult {
   if (method === ACCOUNT_TOOL) captureAccount({ output: result.output, content: result.text })

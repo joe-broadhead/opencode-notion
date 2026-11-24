@@ -140,9 +140,10 @@ export const PARAMETERS: Readonly<Record<string, readonly string[]>> = {}
 export const ALL_TOOLS: readonly string[] = [...READ_TOOLS, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS]
 
 /**
- * The plugin's own reads, tools RPC methods only and never tools Notion lists: `events_list` and `probe`, the pages
- * source's (`src/source.ts`). Their actions, `notion_events_list` and `notion_probe`, match the default block's
- * `notion_*` pattern, so the block allows them by name under every `access`, like a read.
+ * The plugin's own reads: `events_list` is both a tool in the `notion` namespace and a tools RPC method, and `probe`
+ * is a method only; both are the pages source's (`src/source.ts`). Their actions, `notion_events_list` and
+ * `notion_probe`, match the default block's `notion_*` pattern, so the block allows them by name under every `access`,
+ * like a read.
  */
 export const PLUGIN_METHODS: readonly string[] = ["events_list", "probe"]
 

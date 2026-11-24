@@ -5,7 +5,7 @@ import { errorText, NAMESPACE_DESCRIPTION, OAUTH_SCOPE, PLUGIN_ID, SERVER_NAME }
 import { checkHost } from "./host-version.js"
 import { registerToolsRpc } from "@we-the-rebel-alliance/source-contract/tools-rpc"
 import { METHODS, PLUGIN } from "./host/tools-rpc.js"
-import { eventsMethod, probeMethod, signIns } from "./source.js"
+import { eventsMethod, probeMethod, registerEventsTool, signIns } from "./source.js"
 import { watchIntegration } from "./integration.js"
 import { parseOptions } from "./options.js"
 import { defaultRules, registerDefaultRules } from "./permissions.js"
@@ -107,8 +107,8 @@ export function createNotionPlugin(seam: NotionSeam) {
       // Code Mode's catalog describes the server's namespace with this text; a server at another URL keeps its own.
       await ctx.tool.transform((editor) => void (source?.type === "conflict" ? undefined : editor.namespace({ name: SERVER_NAME, description: NAMESPACE_DESCRIPTION })))
       await registerDefaultRules(ctx.agent, defaultRules(options.access), report("rules"))
-      // The workspace name and connection type come from the model's own notion-get-self calls, never from a call of
-      // the plugin's; the watcher also notes when the server last changed status.
+      // The workspace name and connection type come from the plugin's own reads and the tools RPC, never from a call
+      // the plugin makes itself; the watcher also notes when the server last changed status.
       // Who each sign-in is, as probe or a listing read it; forgotten with the account rows on a sign-out or another account.
       const known = signIns()
       const account = await watchAccount(ctx, () => source?.type === "adopted" && source.signIn === "own", owned, () => known.clear())
@@ -132,6 +132,9 @@ export function createNotionPlugin(seam: NotionSeam) {
         methods: [...METHODS, eventsMethod(pages), probeMethod(pages)],
         mcp: { server: SERVER_NAME, managed: () => source?.type !== "conflict" },
       })
+      // The pages source's listing is also a real tool in the `notion` namespace, so the model can call it directly.
+      // On a conflicting server it would always throw SERVER_CONFLICT, so it is not registered there.
+      if (source?.type !== "conflict") await registerEventsTool(pages)
       const stopWatch = watchIntegration(ctx, owned)
       return async () => {
         await stopWatch()

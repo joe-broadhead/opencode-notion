@@ -1,6 +1,6 @@
 {
-  "name": "@joe-broadhead/opencode-notion",
-  "version": "0.0.6",
+  "name": "@we-the-rebel-alliance/notion-plugin",
+  "version": "0.0.0",
   "private": true,
   "description": "Unofficial OpenCode plugin for Notion: search, read and edit your workspace's pages, databases, comments and files through Notion's official MCP server",
   "keywords": [
@@ -12,11 +12,11 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/joe-broadhead/opencode-notion.git"
+    "url": "git+https://github.com/we-the-rebel-alliance/notion-plugin.git"
   },
-  "homepage": "https://github.com/joe-broadhead/opencode-notion#readme",
+  "homepage": "https://github.com/we-the-rebel-alliance/notion-plugin#readme",
   "bugs": {
-    "url": "https://github.com/joe-broadhead/opencode-notion/issues"
+    "url": "https://github.com/we-the-rebel-alliance/notion-plugin/issues"
   },
   "exports": {
     ".": "./dist/index.js",
@@ -36,7 +36,7 @@
     "CHANGELOG.md"
   ],
   "opencode": {
-    "host": ">=2.2.3 <2.4.0",
+    "host": ">=2.4.1 <2.5.0",
     "icons": [
       {
         "src": "assets/icon.svg",
@@ -122,9 +122,9 @@
     "conformance": "bun scripts/conformance.ts"
   },
   "devDependencies": {
-    "@opencode/client": "2.2.3",
-    "@opencode/plugin": "2.2.3",
-    "@opencode/sdk": "2.2.3",
+    "@opencode/client": "2.4.1",
+    "@opencode/plugin": "2.4.1",
+    "@opencode/sdk": "2.4.1",
     "@opentui/core": "0.8.0",
     "@opentui/solid": "0.8.0",
     "@types/bun": "1.4.4",

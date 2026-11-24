@@ -56,6 +56,8 @@ export interface FakeMcpOptions {
   readonly refreshTokens?: boolean
   /** Whether the 401 names a scope. Notion's does; without it OpenCode falls back to every advertised scope. */
   readonly challengeScope?: boolean
+  /** How notion-search answers the pages source's listing: a valid empty page, or an answer the plugin must refuse. */
+  readonly listing?: "valid" | "unreadable"
 }
 
 /** The scripted model's id, as the fake's model API lists it. */
@@ -84,6 +86,8 @@ export interface FakeMcp {
   }
   /** Every token request's form, in order. */
   readonly tokens: Record<string, string>[]
+  /** Every JSON-RPC method the MCP endpoint received, in order, discovery probes included. */
+  readonly methods: string[]
   /** Tool names called, in order. */
   readonly calls: string[]
   /** Each tool call with the path it was sent to, in order. */
@@ -97,9 +101,10 @@ export interface FakeMcp {
   close(): Promise<void>
 }
 
-type Message = { jsonrpc: "2.0"; id?: number | string; method: string; params?: { protocolVersion?: string; name?: string; arguments?: { query?: unknown } } }
+type Message = { jsonrpc: "2.0"; id?: number | string; method: string; params?: { protocolVersion?: string; name?: string; arguments?: { query?: unknown; sort?: unknown } } }
 
 export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMcp> {
+  const methods: string[] = []
   const calls: string[] = []
   const called: { tool: string; path: string }[] = []
   const markers: (string | undefined)[] = []
@@ -110,6 +115,10 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
   const answer = (message: Message, path: string) => {
     const reply = (result: unknown) => ({ jsonrpc: "2.0", id: message.id, result })
     switch (message.method) {
+      // OpenCode 2.4.1 probes a server that declares no protocol with `server/discover` first. This fake declines it,
+      // so a signed-in connection falls back to `initialize`; a 401 ends the attempt before `initialize` runs.
+      case "server/discover":
+        return { jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "Method not found: server/discover" } }
       case "initialize":
         return reply({ protocolVersion: message.params?.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: "fake-notion", version: "0.0.0" } })
       case "tools/list":
@@ -120,6 +129,11 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
         called.push({ tool: name, path })
         const args = message.params?.arguments ?? {}
         if (name === "notion-get-self") return reply({ content: [{ type: "text", text: JSON.stringify(SELF) }], structuredContent: SELF })
+        // The pages source's listing: an empty workspace search, in the shape the plugin reads.
+        if (name === "notion-search" && args.query === "" && args.sort === "last_edited") {
+          const search = options.listing === "unreadable" ? { type: "workspace_search", results: "not-a-list" } : { type: "workspace_search", results: [] }
+          return reply({ content: [{ type: "text", text: JSON.stringify(search) }], structuredContent: search })
+        }
         if (String(args.query ?? "").startsWith("fail")) return reply({ content: [{ type: "text", text: UPSTREAM_FAILURE }], isError: true })
         if (String(args.query ?? "").startsWith("text")) return reply({ content: [{ type: "text", text: `text from ${name}` }] })
         return reply({ content: [{ type: "text", text: `called ${name}` }], structuredContent: { tool: name, path, arguments: args } })
@@ -206,15 +220,18 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
     if (route.startsWith("/.well-known/") || route.startsWith("/oauth")) return signIn(request, response, route)
     markers.push(header(request, "x-notion-test"))
     authorizations.push(header(request, "authorization"))
+    if (request.method !== "POST") return void response.writeHead(405, { allow: "POST" }).end()
+    // Parse before the challenge so a 401 still records which method the probe sent: a discovery 401 ends the attempt.
+    const body = JSON.parse(await read(request)) as Message | Message[]
+    const messages = Array.isArray(body) ? body : [body]
+    for (const message of messages) methods.push(message.method)
     if (fake.challenge) {
       const metadata = `${fake.origin}/.well-known/oauth-protected-resource/mcp`
       return void response
         .writeHead(401, { "content-type": "application/json", "www-authenticate": `Bearer resource_metadata="${metadata}"${options.challengeScope === false ? "" : `, scope="${CHALLENGE_SCOPE}"`}` })
         .end(JSON.stringify({ error: "invalid_token" }))
     }
-    if (request.method !== "POST") return void response.writeHead(405, { allow: "POST" }).end()
-    const body = JSON.parse(await read(request)) as Message | Message[]
-    const replies = (Array.isArray(body) ? body : [body]).filter((message) => message.id !== undefined).map((message) => answer(message, route))
+    const replies = messages.filter((message) => message.id !== undefined).map((message) => answer(message, route))
     if (!replies.length) return void response.writeHead(202).end()
     response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(Array.isArray(body) ? replies : replies[0]))
   })
@@ -225,6 +242,7 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
     origin: `http://127.0.0.1:${port}`,
     model,
     tokens,
+    methods,
     calls,
     called,
     markers,

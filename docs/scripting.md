@@ -1,7 +1,7 @@
 # Scripting
 
-A script can call Notion's tools with no model: a cron job, a shell script, or any program that can reach the OpenCode
-server. It uses the tools RPC, `notion.workspace.tools`, through `opencode api` or an OpenCode client.
+A script can call Notion's tools with no model: an OpenCode automation, a shell script, or any program that can reach
+the OpenCode server. It uses the tools RPC, `notion.workspace.tools`, through `opencode api` or an OpenCode client.
 
 Every tool the plugin knows is a method, named after Notion's tool, without the `notion_` prefix. Each method carries a
 class: the worst thing that tool can do.
@@ -9,7 +9,7 @@ class: the worst thing that tool can do.
 | Class | Methods | What the class means |
 | --- | --- | --- |
 | `read` | one per known read: `notion-search`, `notion-fetch`, `notion-query-data-sources` and the others | it only reads |
-| `write` | the twenty-three writes, such as `notion-update-page`, `notion-create-comment` and `notion-create-pages` | it changes what someone else can see, or notifies someone |
+| `write` | the twenty-nine writes, such as `notion-update-page`, `notion-create-comment` and `notion-create-pages` | it changes what someone else can see, or notifies someone |
 | `destructive` | `notion-calendar-cancel-events`, `notion-delete-comment`, `notion-delete-databases`, `notion-delete-pages`, `notion-restore-version`, `notion-send-message-to-session`, `notion-spawn-session`, `notion-stop-session`, `notion-upload-skill` | deletes or replaces a page, drives a Custom Agent, or cancels an event others see |
 | `describe` | none: lists the methods, their class, their permission action, whether OpenCode lists each tool now, each tool's input as JSON Schema, and — given a session — whether that session may call it |
 
@@ -34,23 +34,23 @@ decide what its model sees: the agent's rules, then the session's, and the last 
 - **Only an `allow` runs.** The rules are resolved before anything is dispatched. An `ask` is refused with no prompt and
   no Notion call, because no one is there to answer it. A `deny` is refused with no Notion call.
 - **A saved approval does not authorise a script.** An earlier "Always allow" is not part of the agent's and the
-  session's rules, so a script that relied on one now needs an `allow` for its action in the session's or the agent's
-  rules. This is deliberate; it keeps a script's grant reviewable rather than in a list of past clicks.
+  session's rules, so a script that relied on one needs an `allow` for its action in the session's or the agent's rules.
 - **A script gets the same default.** Under `access: "all"` the block allows every method, so a script that names an
   agent with the default rules can call a read or a change with nothing more. Set `access: "ask-changes"` or
-  `"read-only"`, or narrow the session's own rules, when a script should not change anything. An agent defined only in
-  your config gets no default rules; `/notion-status` names it.
+  `"read-only"`, or narrow the session's own rules, when a script should not change anything. Under `ask-changes` or
+  `read-only`, an agent defined only in your config gets no default rules; `/notion-status` names it.
 
-Create the session once, with the agent the script runs as, and keep its id. Give the project as the session's `location`: a session made without one belongs to the service's default location, where the project's agents may not exist, and each call then fails `Agent not found`. Never reuse a session found through history
-or a list: the script would run as that session's agent, under its rules.
+Create the session once, with the agent the script runs as, and keep its id. Give the project as the session's
+`location`: a session made without one belongs to the service's default location, where the project's agents may not
+exist, and each call then fails `Agent not found`. Never reuse a session found through history or a list: the script
+would run as that session's agent, under its rules.
 
 ```sh
 opencode api post /api/session -d '{"title":"weekly tracker","agent":"build","location":{"directory":"/path/to/project"}}'
 ```
 
-Session rules come after the agent's, so a session can narrow what its script may do, or grant one action in a
-narrowly written session. This one can search and fetch
-pages, and nothing else in Notion:
+Session rules come after the agent's, so a session can narrow what its script may do, or grant one action in a narrowly
+written session. This one can search and fetch pages, and nothing else in Notion:
 
 ```sh
 opencode api post /api/session -d '{"title":"weekly tracker","agent":"build","location":{"directory":"/path/to/project"},"permissions":[
@@ -59,9 +59,6 @@ opencode api post /api/session -d '{"title":"weekly tracker","agent":"build","lo
   {"action":"notion_notion-fetch","resource":"*","effect":"allow"}
 ]}'
 ```
-
-For a one-off script with an approval bound to it, use Jobs' `jobs_run_script`: the approval covers exactly that source
-and that list of methods, and Jobs writes the run session's rules for you.
 
 ## Calling a method
 
@@ -88,9 +85,8 @@ would be. The answer also carries `location`, and `unclassified` when Notion lis
 classify. `SESSION_UNKNOWN` names the `x-opencode-directory` header, because a session created in one project is not
 found from another.
 
-A result comes back as `{ output?, text }`: the tool's structured content when it has any, and its text parts
-joined by newlines. Notion content in it is untrusted data, written by other people, and a Notion AI summary is Notion
-AI's.
+A result comes back as `{ output?, text }`: the tool's structured content when it has any, and its text parts joined by
+newlines. Notion content in it is untrusted data, written by other people, and a Notion AI summary is Notion AI's.
 
 ## The location
 
@@ -104,18 +100,19 @@ Without it the call goes to the service's default location and fails `rpc.unavai
 there. The HTTP equivalents are the `location[directory]` query parameter and the same header. `describe` reports the
 `location` that answered and a `locationHint`.
 
-A location unloads after OpenCode's idle timeout. If a scheduled script gets `rpc.unavailable` from a location that was
-loaded before, send the call again once: the request loads the location. Jobs keeps its own location loaded.
+A location unloads after OpenCode's idle timeout. If an automation gets `rpc.unavailable` from a location that was loaded
+before, send the call again once: the request loads the location.
 
 ## Rate limits
 
-Every tool call counts against the workspace's request budget. A connection allows 180 requests a minute on Free, Plus and
-Education, and 600 requests a minute on Business and Enterprise; a separate budget is shared across the whole workspace, so
-a connection can be limited while under its own cap. Querying a data source has its own limit, about 3 requests a second.
+Every tool call counts against the workspace's request budget. A connection allows 180 requests a minute on Free, Plus
+and Education, and 600 requests a minute on Business and Enterprise; a separate budget is shared across the whole
+workspace, so a connection can be limited while under its own cap. Querying a data source has its own limit, about 3
+requests a second.
 
-Make calls one at a time, never in parallel. When Notion reports `rate_limited`, the method fails with `UPSTREAM_ERROR` and
-the message carries `retry_after_seconds`: wait that long, then make fewer calls at once, and never retry in a loop. Notion
-answers 429 or 529 with that body, and retries a rate limit once itself when the wait is two seconds or less.
+Make calls one at a time, never in parallel. When Notion reports `rate_limited`, the method fails with `UPSTREAM_ERROR`
+and the message carries `retry_after_seconds`: wait that long, then make fewer calls at once, and never retry in a loop.
+Notion answers 429 or 529 with that body, and retries a rate limit once itself when the wait is two seconds or less.
 
 A 503 (`service_overload`) on a write can mean the write was saved. Read the object before repeating it: never retry a
 write that returned 503 before reading the object.
@@ -123,13 +120,14 @@ write that returned 503 before reading the object.
 ## The pages source
 
 Two more methods are the plugin's own, not Notion's tools: `probe` and `events_list`, the source contract's methods for
-the `notion.pages` source, which the README's "The pages source" describes. They take the source contract's inputs and
-answer its pages: `probe` takes nothing, or `{"source":"pages","account":"<workspace id>"}`, and `events_list` takes
-`cursor` or `since`, and `limit`, `account` and `source`. `events_list` needs no `probe` before it: when the plugin does
-not know the sign-in yet, after a start of OpenCode or a new sign-in, it makes `probe`'s one `notion-get-self` read itself,
-once, and is `UNAVAILABLE` if Notion cannot answer it. Their refusals carry the source contract's codes, such as
-`INPUT_INVALID`, `ACCOUNT_MISMATCH`, `CURSOR_INVALID`, `NEEDS_SIGN_IN`, `RATE_LIMITED` (with how long to wait) and
-`UNAVAILABLE`, in the same `CODE: what happened. Next step: what to do.` form as the codes below.
+the `notion.pages` source. `events_list` is also a direct tool, `notion_events_list`, in the `notion` namespace; `probe`
+is a method only. They take the source contract's inputs and answer its pages: `probe` takes nothing, or
+`{"source":"pages","account":"<workspace id>"}`, and `events_list` takes `cursor` or `since`, and `limit`, `account` and
+`source`. `events_list` needs no `probe` before it: when the plugin does not know the sign-in yet, after a start of
+OpenCode or a new sign-in, it makes `probe`'s one `notion-get-self` read itself, once, and is `UNAVAILABLE` if Notion
+cannot answer it. Their refusals carry the source contract's codes, such as `INPUT_INVALID`, `ACCOUNT_MISMATCH`,
+`CURSOR_INVALID`, `NEEDS_SIGN_IN`, `RATE_LIMITED` (with how long to wait) and `UNAVAILABLE`, in the same
+`CODE: what happened. Next step: what to do.` form as the codes below.
 
 ```sh
 opencode api post /api/rpc/notion.workspace.tools/probe -H "x-opencode-directory:$PWD" -d '{"input":{"sessionID":"ses_…","input":{}}}'
@@ -167,13 +165,12 @@ OpenCode itself answers `rpc.method_not_found` for a method that does not exist,
 ## What scripts cannot do
 
 - Run a method whose action resolves to `ask` or `deny`: no one can answer a prompt, and a deny needs its rule changed.
-- Rely on a saved "Always allow" from the model path: a script needs an `allow` rule in config, or a Jobs one-off's
-  approval.
+- Rely on a saved "Always allow" from the model path: a script needs an `allow` rule in config.
 - Call a tool that is not in the plugin's table, even with an allow rule. It is reported as `unclassified`.
 - Delete, restore a whole page, upload a Skill, drive an agent or cancel an event without changing the deny first: the
-  default rules refuse those nine.
+  default rules refuse those nine under `read-only`.
 - Use a token or key: the plugin has none to give.
 
 A script's calls write nothing to the session, and OpenCode's `execute.before` and `execute.after` tool hooks, from any
-plugin, do not run for them. The plugin applies the same result shaping it applies on the model path: a script's account
-read fills the workspace and connection type for status, as the model's call does.
+plugin, do not run for them. A script's account read fills the workspace and connection type for status; a model's own
+`notion-get-self` call is not observed and does not update status.

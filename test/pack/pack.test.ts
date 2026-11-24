@@ -48,7 +48,7 @@ const DIST = ["dist/index.js", "dist/tui.js"]
 // Modules the host serves to plugins at runtime. Everything else must be inlined in the bundle.
 const SERVER_HOST_MODULES = [/^node:/, /^@opencode\/plugin(?:\/|$)/]
 const TUI_HOST_MODULES = [/^node:/, /^@opencode\/plugin(?:\/|$)/, /^@opentui\//, /^solid-js(?:\/|$)/]
-// The host packages OpenCode 2.2.3 ships; the versions come from devDependencies.
+// The host packages OpenCode 2.4.1 ships; the versions come from devDependencies.
 const HOST_PACKAGES = ["@opencode/plugin", "@opentui/core", "@opentui/solid", "solid-js"]
 // The stock OpenCode releases the package is tested on: the one list in src/constants.ts.
 const HOST_VERSIONS = TESTED_HOSTS
@@ -291,7 +291,7 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
   const status = async () => (await host.api<{ output: Record<string, any> }>("POST", "/api/rpc/notion.workspace/status", { input: {} })).output
 
   beforeAll(async () => {
-    fake = await startFakeMcp({ catalog: "notion" })
+    fake = await startFakeMcp({ catalog: "notion", listing: "unreadable" })
     host = await serve(version, pointedAt(fake, `tools-${version}`), {
       name: `tools-${version}`,
       // Config-only agents get no default rules: their own rules decide, after the host's defaults.
@@ -301,7 +301,7 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     const tools = READ_TOOLS.length + WRITE_TOOLS.length + DESTRUCTIVE_TOOLS.length + 1
     await host.until(`notion is connected with its ${tools} tools`, async () => {
       const output = await status()
-      return output.state === "connected" && output.tools === tools && output.unknownCount === 1 && output.deniedTools.length === DESTRUCTIVE_TOOLS.length
+      return output.state === "connected" && output.tools === tools && output.unknownCount === 1 && output.destructiveTools.length === DESTRUCTIVE_TOOLS.length
     })
     const create = async (body: Record<string, unknown>) => {
       const created = await host.api<Record<string, any>>("POST", "/api/session", body)

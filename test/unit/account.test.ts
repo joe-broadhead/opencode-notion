@@ -1,7 +1,7 @@
-// The workspace name and connection type status shows. They come only from a notion-get-self result the model or a
-// script asked for: the plugin never calls Notion itself.
+// The workspace name and connection type status shows. They come only from a plugin read (`events_list`, `probe`) or a
+// script's notion-get-self call: the plugin never calls Notion itself, and it registers no model-path hook.
 import { describe, expect, test } from "bun:test"
-import { accountOf, watchAccount } from "../../src/account.js"
+import { accountOf, captureAccount, watchAccount } from "../../src/account.js"
 
 const SELF = {
   object: "user",
@@ -39,43 +39,33 @@ describe("accountOf", () => {
   })
 })
 
-/** A context with the members the watcher uses, feeding one hook call and one event by hand. */
+/** A context with the members the watcher uses, feeding one event by hand. */
 function fake() {
-  const handlers = new Map<string, (event: unknown) => Promise<void>>()
-  const disposed: string[] = []
   let push: (() => void) | undefined
   let next: { type: string; data: Record<string, unknown> } = { type: "mcp.status.changed", data: { server: "notion" } }
   /** The event types the watcher asked for: a real host delivers only those. */
   const subscribed: string[] = []
   const ctx = {
-    tool: {
-      hook: async (name: string, handler: (event: unknown) => Promise<void>) => {
-        handlers.set(name, handler)
-        return { dispose: async () => void disposed.push(name) }
-      },
-    },
     mcp: { list: async () => ({ data: [{ name: "notion", status: { status: "needs_auth" } }] }) },
     event: {
       subscribe: ({ signal, types }: { signal: AbortSignal; types: readonly string[] }) => {
         subscribed.push(...types)
         return {
-        async *[Symbol.asyncIterator]() {
-          while (!signal.aborted) {
-            await new Promise<void>((resolve) => {
-              push = resolve
-              signal.addEventListener("abort", () => resolve(), { once: true })
-            })
-            if (!signal.aborted) yield next
-          }
-        },
+          async *[Symbol.asyncIterator]() {
+            while (!signal.aborted) {
+              await new Promise<void>((resolve) => {
+                push = resolve
+                signal.addEventListener("abort", () => resolve(), { once: true })
+              })
+              if (!signal.aborted) yield next
+            }
+          },
         }
       },
     },
   }
   return {
     ctx,
-    handlers,
-    disposed,
     subscribed,
     /** Emits the event `next` was set to. */
     emit: (event?: { type: string; data: Record<string, unknown> }) => {
@@ -87,17 +77,30 @@ function fake() {
 }
 
 describe("watchAccount", () => {
-  test("captures a completed notion-get-self from the model path, and nothing else", async () => {
+  test("captures the account from a plugin read, and stops capturing after stop", async () => {
     const view = fake()
     const account = await watchAccount(view.ctx as never)
-    const hook = view.handlers.get("execute.after")!
-    await hook({ tool: "notion_notion-get-self", status: "completed", result: { output: SELF } })
-    expect(account.current()).toEqual({ workspace: "Acme Robotics", connection: "person" })
-    await hook({ tool: "notion_notion-search", status: "completed", result: { output: SELF } })
-    await hook({ tool: "notion_notion-get-self", status: "error", result: { output: SELF } })
+    captureAccount({ output: SELF })
     expect(account.current()).toEqual({ workspace: "Acme Robotics", connection: "person" })
     await account.stop()
-    expect(view.disposed).toEqual(["execute.after"])
+    captureAccount({ output: { ...SELF, workspace: { name: "Later" } } })
+    expect(account.current()).toEqual({ workspace: "Acme Robotics", connection: "person" })
+  })
+
+  test("captures nothing while an instance holds its own sign-in, which may be another workspace", async () => {
+    const view = fake()
+    const account = await watchAccount(view.ctx as never, () => true)
+    captureAccount({ output: SELF })
+    expect(account.current()).toBeUndefined()
+    await account.stop()
+  })
+
+  test("captures nothing when its server is not Notion's", async () => {
+    const view = fake()
+    const account = await watchAccount(view.ctx as never, () => false, () => false)
+    captureAccount({ output: SELF })
+    expect(account.current()).toBeUndefined()
+    await account.stop()
   })
 
   test("notes when the server changed status, for the still-listing row", async () => {
@@ -118,7 +121,7 @@ describe("watchAccount", () => {
     const view = fake()
     const account = await watchAccount(view.ctx as never)
     expect(account.signedIn()).toBe(false)
-    await view.handlers.get("execute.after")!({ tool: "notion_notion-get-self", status: "completed", result: { output: SELF } })
+    captureAccount({ output: SELF })
     expect(account.signedIn()).toBe(true)
     view.emit()
     await view.settle()
@@ -135,8 +138,8 @@ describe("watchAccount", () => {
   test("forgets what was read on a credential update as on a switch, and asks the host for both events", async () => {
     const view = fake()
     let forgotten = 0
-    const account = await watchAccount(view.ctx as never, () => true, () => true, () => void forgotten++)
-    await view.handlers.get("execute.after")!({ tool: "notion_notion-get-self", status: "completed", result: { output: SELF } })
+    const account = await watchAccount(view.ctx as never, () => false, () => true, () => void forgotten++)
+    captureAccount({ output: SELF })
     expect(account.current()).toEqual({ workspace: "Acme Robotics", connection: "person" })
     expect(view.subscribed).toContain("credential.updated")
     view.emit({ type: "credential.updated", data: {} })

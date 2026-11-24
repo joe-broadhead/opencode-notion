@@ -22,10 +22,10 @@ import { agentRules, attempt, cleanup, effect, HOST_VERSION, session, startHost,
 const TOKEN = "ntn_fake_host_test_0123456789"
 const SIGN_IN = "Run /connect and choose Notion, then press o or Enter to open the link (in a terminal, opencode mcp auth notion opens it automatically: run it from the project folder where the plugin is installed, and if it answers MCP server not found: notion, wait a few seconds and run it again)."
 const SIGN_IN_AGAIN = "Notion needs a new sign-in. Choose this account to sign in again."
-/** The default list: two reads, every write, every destructive tool, and the unknown one. */
-const LISTED = 2 + WRITE_TOOLS.length + DESTRUCTIVE_TOOLS.length + 1
-/** Every tool OpenCode lists, the unknown one included: status counts them all. */
-const AVAILABLE = LISTED
+/** The default list: two reads, every write, every destructive tool, the plugin's own events_list, and the unknown one. */
+const LISTED = 2 + WRITE_TOOLS.length + DESTRUCTIVE_TOOLS.length + 1 + 1
+/** Notion's own tools that OpenCode lists, the unknown one included: status does not count the plugin's events_list. */
+const AVAILABLE = LISTED - 1
 const OFF = `${DESTRUCTIVE_TOOLS.slice(0, -1).join(", ")} and ${DESTRUCTIVE_TOOLS.at(-1)}`
 
 // Starting a host takes several seconds, more on a busy machine; the longest wait below polls a condition with 180 s.
@@ -130,11 +130,18 @@ describe(`the plugin on OpenCode ${HOST_VERSION}`, () => {
     expect(plugins.find((plugin) => plugin.id === "notion.workspace")?.state.status).toBe("active")
     const { data: servers } = await host.client.mcp.list({ location: host.location })
     expect(servers.find((server) => server.name === "notion")?.status).toEqual({ status: "connected" })
-    expect(await notionTools(host)).toEqual([...["shiny_new_tool", SAMPLE_READ, ACCOUNT_READ, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS].map((tool) => `notion_${tool}`)].sort())
+    expect(await notionTools(host)).toEqual([...["shiny_new_tool", SAMPLE_READ, ACCOUNT_READ, "events_list", ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS].map((tool) => `notion_${tool}`)].sort())
     const { data: skills } = await host.client.skill.list({ location: host.location })
     expect(skills.map((skill) => skill.id).filter((id) => id.startsWith("notion")).sort()).toEqual([...SKILL_NAMES].sort())
     const { data: commands } = await host.client.command.list({ location: host.location })
     expect(commands.map((command) => command.name)).toContain("notion-status")
+  })
+
+  // OpenCode 2.4.1 probes a server with no `protocol` with `server/discover` first; this fake declines it, so the
+  // connection falls back to `initialize`.
+  test("a server with no protocol is probed with server/discover before initialize", () => {
+    expect(host.fake.methods).toContain("server/discover")
+    expect(host.fake.methods.indexOf("server/discover")).toBeLessThan(host.fake.methods.indexOf("initialize"))
   })
 
   test("P1: the rules sit right after the base allow in every built-in agent, once", async () => {
@@ -254,8 +261,8 @@ describe(`the plugin on OpenCode ${HOST_VERSION}`, () => {
     const elsewhere = join(ROOT, "elsewhere")
     mkdirSync(elsewhere, { recursive: true })
     const rpc = (host.client.rpc as unknown as (definition: object) => ToolsClient)(TOOLS_CONTRACT)
-    // From OpenCode 2.2.7 a location opened by a call answers before its plugins have loaded: until the plugin has
-    // registered there, the call is rpc.unavailable. Any other error fails the test at once.
+    // A location opened by a call answers before its plugins have loaded: until the plugin has registered there, the
+    // call is rpc.unavailable. Any other error fails the test at once.
     const loaded = (options: object) =>
       until("the plugin has loaded in the location", () =>
         rpc.describe!({}, options).then(
@@ -305,7 +312,7 @@ describe(`the plugin on OpenCode ${HOST_VERSION}`, () => {
     const text = await status(host, await session(host))
     expect(text).toContain(`- Connection: connected (${host.fake.url}, registered by this plugin)`)
     // No account read yet, so no workspace name.
-    expect(text).toContain("- Account: not read yet: it appears after a notion-get-self call\n")
+    expect(text).toContain("- Account: not read yet: it appears after an events_list or probe read\n")
     // A host with a config-only agent still names it under the restricting values; this host runs the default `all`.
     expect(text).toContain("- Access: access all: every Notion tool is allowed, reads and changes alike; every agent has the block\n")
     // Notion's own sign-in metadata calls the server beta; status says so wherever it runs.
@@ -317,17 +324,16 @@ describe(`the plugin on OpenCode ${HOST_VERSION}`, () => {
     expect(text).toContain(`- OpenCode: ${HOST_VERSION} (${TESTED_HOSTS.includes(HOST_VERSION) ? "tested" : "untested"}; supported range ${SUPPORTED_HOST})`)
     expect(text).not.toContain("Plan")
     const output = await statusRpc(host)
-    expect(output).toMatchObject({ state: "connected", access: "all", workspace: null, connection: null, beta: true, tools: AVAILABLE, deniedTools: [...DESTRUCTIVE_TOOLS], unknownCount: 1, listing: false, unguardedAgents: [] })
+    expect(output).toMatchObject({ state: "connected", access: "all", workspace: null, connection: null, beta: true, tools: AVAILABLE, destructiveTools: [...DESTRUCTIVE_TOOLS], unknownCount: 1, listing: false, unguardedAgents: [] })
     // DR-9: status is built from the host's own lists; neither the command nor the RPC calls Notion. The dialog shows the
     // same RPC answer through the terminal UI, so it adds no call either.
     expect(host.fake.calls.slice(before)).toEqual([])
   })
 
-  test("the account comes from a notion-get-self the model or a script asked for, never a call of the plugin's", async () => {
+  test("the account comes from a script's notion-get-self, never a call of the plugin's", async () => {
     expect(await statusRpc(host)).toMatchObject({ workspace: null, connection: null })
     const sessionID = await session(host)
-    // The tools RPC's executor skips execute.after, so its result shaping records the account; the model path's hook
-    // does the same for a model turn, which account.test.ts covers.
+    // The tools RPC's result shaping records the account; the plugin registers no model-path hook.
     expect(JSON.parse(await scriptCall(host, "notion-get-self", { sessionID, input: {} }))).toHaveProperty("output")
     const output = await until("status reads the workspace", async () => {
       const current = await statusRpc(host)
@@ -629,7 +635,7 @@ describe("a server that just connected and lists no tools yet", () => {
 
   test("is still listing, with no advice to ask an admin", async () => {
     const output = await statusRpc(host)
-    expect(output).toMatchObject({ state: "connected", tools: 0, deniedTools: [], listing: true })
+    expect(output).toMatchObject({ state: "connected", tools: 0, destructiveTools: [], listing: true })
     expect(output.nextStep).toBe("Notion is still listing its tools. Run /notion-status again in a few seconds.")
     const text = await status(host, await session(host))
     expect(text).toContain("- Tools: none listed yet (Notion is still listing them)")
@@ -706,7 +712,12 @@ describe("a server that asks for a sign-in", () => {
     host.fake.challenge = true
     const mcp = host.client.mcp as unknown as Record<"connect" | "disconnect", (input: object) => Promise<unknown>>
     await mcp.disconnect({ server: "notion", location: host.location })
+    const before = host.fake.methods.length
     await mcp.connect({ server: "notion", location: host.location }).catch(() => {})
+    // A 401 from the discovery probe ends the attempt: no initialize follows.
+    const attempt = host.fake.methods.slice(before)
+    expect(attempt).toContain("server/discover")
+    expect(attempt).not.toContain("initialize")
     const server = await until("the server needs a sign-in", async () => {
       const { data } = await host.client.mcp.list({ location: host.location })
       const found = data.find((item) => item.name === "notion")
@@ -820,5 +831,37 @@ describe("the /connect entry", () => {
     await until("the entry is named Notion again after the reload", async () => (await entry())?.name === "Notion")
     await Bun.sleep(1000)
     expect((await entry())?.name).toBe("Notion")
+  })
+})
+
+// The pages source's events_list is a real tool in the notion namespace: listed beside Notion's tools, and callable
+// from a Code Mode program as tools.notion.events_list, with the same run as the tools RPC method.
+describe("events_list as a tool in Code Mode", () => {
+  let host: Host
+  beforeAll(async () => {
+    host = await modelHost(true)
+  })
+  afterAll(() => host?.close())
+
+  test("lists in the notion namespace and answers a Code Mode call with the pages source's page", async () => {
+    const ids = (await host.probe().tool.list()).map((tool) => tool.id)
+    expect(ids).toContain("notion_events_list")
+    const code = [
+      'const page = await tools.notion.events_list({ source: "pages", since: "2026-11-15T00:00:00Z" })',
+      "return { account: page.account, events: page.events.length, trust: page.trust }",
+    ].join("\n")
+    host.fake.model.script = [{ tool: "execute", arguments: { code } }]
+    const before = host.fake.model.requests.length
+    const sessionID = (await scripted(host).create({ agent: "build", location: host.location, model: { providerID: "lmstudio", id: MODEL_ID } })).id
+    await scripted(host).prompt({ sessionID, text: "List the pages I edited." })
+    await until("the model's final turn", async () => host.fake.model.requests.slice(before).some((request) => (request as { messages?: { role: string }[] }).messages?.some((message) => message.role === "tool")))
+    // The tool ran the pages source: one identity read, then one search per author filter.
+    expect(host.fake.calls).toContain("notion-get-self")
+    expect(host.fake.calls.filter((name) => name === "notion-search")).toHaveLength(2)
+    // What the program returned reached the model: the workspace probe named and an empty page.
+    const turns = JSON.stringify(host.fake.model.requests.slice(before))
+    expect(turns).toContain('\\"account\\":\\"1111\\"')
+    expect(turns).toContain('\\"events\\":0')
+    expect(turns).toContain("untrusted")
   })
 })

@@ -65,11 +65,11 @@ interface Capture {
 }
 
 /**
- * Every running plugin instance's capture. The tools RPC's reads skip the `execute.after` hook, and its result shaping
- * learns neither the instance nor the location that served the call, so it tells every instance. That is right only
- * while they share OpenCode's one Notion sign-in. An instance whose project adopts its own entry with a token may be
- * another workspace, so while any instance does, a script's account read updates no status: the model path, whose hook
- * belongs to its own instance, still does.
+ * Every running plugin instance's capture. The tools RPC's result shaping learns neither the instance nor the location
+ * that served the call, so it tells every instance. That is right only while they share OpenCode's one Notion sign-in.
+ * An instance whose project adopts its own entry with a token may be another workspace, so while any instance does, a
+ * script's account read updates no status. The plugin's own reads (`events_list`, `probe`) capture through their own
+ * instance, and no `execute.after` hook is registered for a model's direct `notion-get-self` call.
  */
 const captures = new Set<Capture>()
 
@@ -82,13 +82,13 @@ export function captureAccount(result: AccountResult): void {
 const RESUBSCRIBE_MS = 5_000
 
 /**
- * Captures the account from the model's `notion-get-self` calls and the tools RPC's, and forgets it when the user signs
- * out or switches accounts. Also notes when the server's status last changed, so status can tell a server that is
- * still listing its tools from one that lists none. Returns the current account and a cleanup.
+ * Captures the account from the plugin's own reads and the tools RPC's, and forgets it when the user signs out or
+ * switches accounts. Also notes when the server's status last changed, so status can tell a server that is still
+ * listing its tools from one that lists none. Returns the current account and a cleanup. No per-request hook is
+ * registered: a model's direct `notion-get-self` call is not observed.
  */
 export async function watchAccount(
   ctx: {
-    readonly tool: Pick<Plugin.Context["tool"], "hook">
     readonly mcp: Pick<Plugin.Context["mcp"], "list">
     readonly event: Pick<Plugin.Context["event"], "subscribe">
   },
@@ -106,9 +106,6 @@ export async function watchAccount(
     account = accountOf(result) ?? account
     if (account) known = true
   }
-  const hook = await ctx.tool.hook("execute.after", async (event) => {
-    if (event.tool === `${SERVER_NAME}_${ACCOUNT_TOOL}` && event.status === "completed" && owned()) capture(event.result)
-  })
   const entry: Capture = { capture, ownSignIn, owned }
   captures.add(entry)
 
@@ -154,7 +151,6 @@ export async function watchAccount(
       stopped.abort()
       captures.delete(entry)
       await watching
-      await hook.dispose()
     },
   }
 }
