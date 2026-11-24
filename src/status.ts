@@ -2,7 +2,7 @@ import type { Plugin, Rpc } from "@opencode/plugin"
 import type { Account } from "./account.js"
 import { codeText, PLUGIN_ID, SERVER_NAME, TESTED_HOSTS } from "./constants.js"
 import { isSupportedHost, type HostCheck } from "./host-version.js"
-import { classify, DESTRUCTIVE_TOOLS, WRITE_TOOLS } from "./notion-tools.js"
+import { classify, DESTRUCTIVE_TOOLS, PLUGIN_METHODS, WRITE_TOOLS } from "./notion-tools.js"
 import { ACCESS, defaultRules, unguardedAgents, type Access, type Rule } from "./permissions.js"
 import { cut, oneLine, shortReason } from "./redact.js"
 import { VERSION } from "./version.js"
@@ -77,8 +77,6 @@ export interface Status {
    * `ask-changes` asks for each, and `read-only` denies them. A later rule of the user's still wins.
    */
   readonly destructiveTools: readonly string[]
-  /** @deprecated The family field's old name; it carries the same list as `destructiveTools`. */
-  readonly deniedTools: readonly string[]
   /** True while a server that just connected may still be listing its tools. */
   readonly listing: boolean
   /** How many of them the plugin does not know. */
@@ -116,7 +114,7 @@ const AGENTS_NEXT_STEP =
 const NOTHING_TO_DO = "Nothing to do."
 const ACCOUNT_LIMIT = 80
 
-const TESTED_TEXT = `${TESTED_HOSTS.slice(0, -1).join(", ")} or ${TESTED_HOSTS.at(-1)}`
+const TESTED_TEXT = TESTED_HOSTS.length < 2 ? TESTED_HOSTS.join("") : `${TESTED_HOSTS.slice(0, -1).join(", ")} or ${TESTED_HOSTS.at(-1)}`
 const LISTED_UNKNOWN = 20
 // A tool name comes from the server; list only plain names. Notion's own names carry hyphens.
 const SAFE_NAME = /^[a-z][a-z0-9_-]{0,63}$/
@@ -151,7 +149,6 @@ export function buildStatus(facts: StatusFacts): Status {
     beta: true,
     tools: listed.length,
     destructiveTools: destructive,
-    deniedTools: destructive,
     listing: state === "connected" && listed.length === 0 && facts.settling === true,
     unknownCount: unknown.length,
     unknownTools: unknown.filter((name) => SAFE_NAME.test(name)).slice(0, LISTED_UNKNOWN),
@@ -344,7 +341,7 @@ export async function readStatus(ctx: StatusContext, input: ReadFacts | (() => R
     wasSignedIn,
     ...(server ? { server: server.status } : {}),
     ...(account ? { account } : {}),
-    tools: tools.filter((tool) => tool.options?.namespace === SERVER_NAME).map((tool) => tool.name),
+    tools: tools.filter((tool) => tool.options?.namespace === SERVER_NAME && !PLUGIN_METHODS.includes(tool.name)).map((tool) => tool.name),
     settling,
     agents: agents.data,
     ...(own && listed ? { skills: { own, listed } } : {}),
@@ -365,8 +362,8 @@ const count = { type: "integer", minimum: 0 }
 const nullableString = { type: ["string", "null"] }
 
 /**
- * One read-only method for the terminal UI view and scripts. The UI part does not receive the plugin options on 2.2.x,
- * and cannot see the server's own findings, so it asks the server for the same status /notion-status reports.
+ * One read-only method for the terminal UI view and scripts. The UI part cannot see the server part's findings, so it
+ * asks the server for the same status /notion-status reports.
  */
 export const StatusRpc = {
   id: PLUGIN_ID,
@@ -375,7 +372,7 @@ export const StatusRpc = {
       input: { type: "object" },
       output: {
         type: "object",
-        required: ["version", "access", "state", "workspace", "connection", "beta", "tools", "deniedTools", "listing", "unknownCount", "unknownTools", "unguardedAgents", "host", "problems", "nextStep"],
+        required: ["version", "access", "state", "workspace", "connection", "beta", "tools", "destructiveTools", "listing", "unknownCount", "unknownTools", "unguardedAgents", "host", "problems", "nextStep"],
         properties: {
           version: { type: "string" },
           access: { enum: [...ACCESS] },
@@ -391,7 +388,6 @@ export const StatusRpc = {
           beta: { type: "boolean" },
           tools: count,
           destructiveTools: strings,
-          deniedTools: strings,
           listing: { type: "boolean" },
           unknownCount: count,
           unknownTools: strings,

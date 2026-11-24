@@ -56,6 +56,8 @@ export interface FakeMcpOptions {
   readonly refreshTokens?: boolean
   /** Whether the 401 names a scope. Notion's does; without it OpenCode falls back to every advertised scope. */
   readonly challengeScope?: boolean
+  /** How notion-search answers the pages source's listing: a valid empty page, or an answer the plugin must refuse. */
+  readonly listing?: "valid" | "unreadable"
 }
 
 /** The scripted model's id, as the fake's model API lists it. */
@@ -97,7 +99,7 @@ export interface FakeMcp {
   close(): Promise<void>
 }
 
-type Message = { jsonrpc: "2.0"; id?: number | string; method: string; params?: { protocolVersion?: string; name?: string; arguments?: { query?: unknown } } }
+type Message = { jsonrpc: "2.0"; id?: number | string; method: string; params?: { protocolVersion?: string; name?: string; arguments?: { query?: unknown; sort?: unknown } } }
 
 export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMcp> {
   const calls: string[] = []
@@ -120,6 +122,11 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
         called.push({ tool: name, path })
         const args = message.params?.arguments ?? {}
         if (name === "notion-get-self") return reply({ content: [{ type: "text", text: JSON.stringify(SELF) }], structuredContent: SELF })
+        // The pages source's listing: an empty workspace search, in the shape the plugin reads.
+        if (name === "notion-search" && args.query === "" && args.sort === "last_edited") {
+          const search = options.listing === "unreadable" ? { type: "workspace_search", results: "not-a-list" } : { type: "workspace_search", results: [] }
+          return reply({ content: [{ type: "text", text: JSON.stringify(search) }], structuredContent: search })
+        }
         if (String(args.query ?? "").startsWith("fail")) return reply({ content: [{ type: "text", text: UPSTREAM_FAILURE }], isError: true })
         if (String(args.query ?? "").startsWith("text")) return reply({ content: [{ type: "text", text: `text from ${name}` }] })
         return reply({ content: [{ type: "text", text: `called ${name}` }], structuredContent: { tool: name, path, arguments: args } })

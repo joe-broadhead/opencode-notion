@@ -5,7 +5,7 @@ import { errorText, NAMESPACE_DESCRIPTION, OAUTH_SCOPE, PLUGIN_ID, SERVER_NAME }
 import { checkHost } from "./host-version.js"
 import { registerToolsRpc } from "@we-the-rebel-alliance/source-contract/tools-rpc"
 import { METHODS, PLUGIN } from "./host/tools-rpc.js"
-import { eventsMethod, probeMethod, signIns } from "./source.js"
+import { eventsMethod, probeMethod, registerEventsTool, signIns } from "./source.js"
 import { watchIntegration } from "./integration.js"
 import { parseOptions } from "./options.js"
 import { defaultRules, registerDefaultRules } from "./permissions.js"
@@ -132,6 +132,8 @@ export function createNotionPlugin(seam: NotionSeam) {
         methods: [...METHODS, eventsMethod(pages), probeMethod(pages)],
         mcp: { server: SERVER_NAME, managed: () => source?.type !== "conflict" },
       })
+      // The pages source's listing is also a real tool in the `notion` namespace, so the model can call it directly.
+      await registerEventsTool(pages)
       const stopWatch = watchIntegration(ctx, owned)
       return async () => {
         await stopWatch()
