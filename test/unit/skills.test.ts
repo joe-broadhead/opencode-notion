@@ -36,8 +36,9 @@ describe("skills", () => {
     expect(skill.name as string).toBe(name)
     expect(skill.description?.length).toBeGreaterThan(40)
     expect(text.split("\n").filter((line) => line.startsWith("description:"))).toHaveLength(1)
-    // A YAML reader would split the line at either of these.
-    expect(skill.description).not.toMatch(/: | #/)
+    // A YAML reader would split an unquoted plain scalar at either of these; the shipped values are quoted.
+    const line = text.split("\n").find((entry) => entry.startsWith("description:")) ?? ""
+    if (/: | #/.test(skill.description ?? "")) expect(line).toMatch(/^description: ".*"$/)
     expect(skill.content.length).toBeGreaterThan(0)
   })
 
@@ -84,10 +85,9 @@ describe("skills", () => {
   })
 
   test("the descriptions route Notion's pages here, and other systems, recordings and changes elsewhere", () => {
-    expect(description("notion")).toContain("Load before the first Notion tool call")
-    expect(description("notion")).toContain("a page, doc, spec, brief or wiki page")
-    expect(description("notion")).toContain("Not for Google Docs, Drive, Gmail or Google Calendar (Google Workspace), Slack messages, GitHub code, Linear issues, Jira or Confluence (jira), or a recorded meeting (Granola or Wispr Flow).")
-    expect(description("notion-write")).toContain("Load before any Notion change")
+    expect(description("notion")).toContain("The user's Notion workspace: pages, docs, wikis, databases and trackers")
+    expect(description("notion")).toContain("Not for Google Docs or Calendar (gws), recorded meetings (granola), or remembering things (Memory).")
+    expect(description("notion-write")).toContain("Before any Notion change: create or edit a page")
     for (const name of NAMES) expect(description(name)).not.toMatch(/\bpost to Slack\b|\bschedule a meeting\b/i)
   })
 
@@ -280,7 +280,7 @@ describe("skills", () => {
 
   test.each(NAMES)("%s links only to plain files an agent can read, never to a GitHub page", (name) => {
     const links = read(name).match(/https?:\/\/[^\s)>]*[^\s)>.,]/g) ?? []
-    for (const link of links) expect(link).toMatch(/^https:\/\/raw\.githubusercontent\.com\/joe-broadhead\/opencode-notion\/HEAD\//)
+    for (const link of links) expect(link).toMatch(/^https:\/\/raw\.githubusercontent\.com\/we-the-rebel-alliance\/notion-plugin\/master\//)
   })
 
   test("notion's scripts section creates a session for the script, never borrows one, and calls one at a time", () => {

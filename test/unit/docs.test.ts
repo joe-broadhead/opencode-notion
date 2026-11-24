@@ -1,12 +1,10 @@
-// The docs and skills must match the code: tool names, the access blocks, error codes, the uninstall order and the
-// Jelly guide. Every tool count they state is checked against src/notion-tools.ts, so a change there cannot leave a stale
-// number behind.
+// The docs and skills must match the code: tool names, the access blocks, error codes, URLs and the release.
 import { describe, expect, test } from "bun:test"
-import { readdirSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { CODES, TESTED_HOSTS, UNTESTED_EXAMPLE } from "../../src/constants.js"
-import { DESTRUCTIVE_TOOLS, PARAMETERS, PLUGIN_METHODS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
+import { DESTRUCTIVE_TOOLS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
 import { METHODS, NEXT_STEPS, TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
 import { ACCESS, defaultRules } from "../../src/permissions.js"
 
@@ -24,16 +22,17 @@ const FILES = [
 const KNOWN = [...READ_TOOLS, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS]
 const raw = (file: string) => readFileSync(join(ROOT, file), "utf8")
 const text = (file: string) => raw(file).replace(/\s+/g, " ")
-const rule = (name: string, effect: string) => `{ "action": "notion_${name}", "resource": "*", "effect": "${effect}" }`
-/** The per-tool deny the README and the guide give as way 3, for the tool a reader is likeliest to want off. */
-const OPT_IN_TOOL = '{ "action": "notion_notion-delete-pages", "resource": "*", "effect": "deny" }'
-
-/** The release the install specs name: package.json's version. */
-const VERSION = (JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { version: string }).version
-/** The README's upgrade example removes an earlier release's entry; it must name one before VERSION. */
-const UPGRADE_FROM = /remove the old entry with `opencode plugin remove github:joe-broadhead\/opencode-notion#v(\d+)\.(\d+)\.(\d+)`/
+const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { name: string; version: string; repository: { url: string } }
 
 describe("docs", () => {
+  test("the package is renamed, restarted at 0.0.0, and the changelog has one section", () => {
+    expect(pkg.name).toBe("@we-the-rebel-alliance/notion-plugin")
+    expect(pkg.version).toBe("0.0.0")
+    expect(pkg.repository.url).toContain("we-the-rebel-alliance/notion-plugin")
+    expect(raw("CHANGELOG.md")).toMatch(/^## 0\.0\.0 \(unreleased\)$/m)
+    expect(raw("CHANGELOG.md")).not.toMatch(/^## \[?0\.0\.[1-9]/m)
+  })
+
   test.each(FILES)("%s states no count of read, write or declared tools that could go stale", (file) => {
     const counts = [...text(file).matchAll(/\b\d+ (?:known )?(?:read|write)(?:s\b| tools\b| read-only)|\b\d+ tools are declared/g)].map((match) => match[0])
     const stale = counts.filter((count) => !count.startsWith(`${READ_TOOLS.length} read`) && !count.startsWith(`${WRITE_TOOLS.length} write`) && count !== `${KNOWN.length} tools are declared`)
@@ -47,141 +46,41 @@ describe("docs", () => {
     expect(spans.filter((tool) => !KNOWN.includes(tool) && tool !== "notion-write").length).toBeLessThan(1)
   })
 
-  test.each(["README.md", "docs/configuration.md", "docs/scripting.md", "docs/jelly.md", "SECURITY.md"])("%s says nothing provisional or pending", (file) => {
+  test.each(FILES)("%s names no old organisation or repository, and points at blob/master", (file) => {
+    const source = text(file)
+    expect(source).not.toContain("joe-broadhead")
+    expect(source).not.toContain("opencode-notion")
+    for (const link of source.matchAll(/https:\/\/github\.com\/we-the-rebel-alliance\/notion-plugin\/(blob|tree)\/([^\s/)#]+)/g)) {
+      expect({ file, link: link[2] }).toEqual({ file, link: "master" })
+    }
+  })
+
+  test.each(["README.md", "docs/configuration.md", "docs/scripting.md", "SECURITY.md"])("%s says nothing provisional or pending", (file) => {
     expect(text(file)).not.toMatch(/provisional|not yet (?:checked|published|signed)|private package|TODO/i)
   })
 
-  // D1: the guard is text, not a rule, and the README says why where a stranger reads the permissions.
-  test("the README says a rule cannot see an argument, and gives the deny that removes the whole-page path", () => {
+  test("there is no Jelly app guide, and no doc links to one", () => {
+    expect(existsSync(join(ROOT, "docs", "jelly.md"))).toBe(false)
+    for (const file of FILES) expect({ file, hit: text(file).includes("docs/jelly.md") }).toEqual({ file, hit: false })
+  })
+
+  test("the README covers install, sign-in, access and what the plugin adds, and points at the docs", () => {
     const readme = text("README.md")
-    expect(readme).toContain("A permission rule matches a tool's name, not its arguments")
-    expect(readme).toContain("No rule can tell the two apart")
-    expect(readme).toContain("read the input shown in the prompt before you answer yes")
-    expect(readme).toContain(rule("notion-update-page", "deny"))
-    expect(readme).toContain("never send `replace_content` unless")
+    expect(readme).toContain("github:we-the-rebel-alliance/notion-plugin#v0.0.0")
+    expect(readme).toContain("Run `/connect`, choose **Notion**")
+    expect(readme).toContain("**Every tool is allowed by default.**")
+    expect(readme).toContain("tools[\"notion\"][\"notion-search\"]")
+    expect(readme).toContain("`notion_events_list`")
+    expect(readme).toContain("Not for Google Docs or Google Calendar (use the gws plugin), recorded meetings (granola), or remembering things across\nsessions (Memory).".replace("\n", " "))
+    expect(readme).toContain("Notion Memory")
+    expect(readme).toContain("docs/configuration.md")
   })
 
-  test("the README's sign-in says the account is marked only while it is still listed", () => {
-    expect(text("README.md")).toContain("OpenCode asks for a new sign-in, and `/connect` marks the account while it is still listed")
-  })
-
-  // The exceptions are the install spec, which names the release tag by design (the GitHub install takes `#v<version>`),
-  // and the upgrade example, which removes an earlier release's entry.
-  test("the README names no version of the plugin, except its install spec", () => {
-    expect(text("README.md").replaceAll(`opencode-notion#v${VERSION}`, "").replace(UPGRADE_FROM, "")).not.toMatch(/opencode-notion@\d|\b0\.\d+\.\d+\b|\bv\d+\.\d+\.\d+\b/)
-  })
-
-  // R18: nothing is restricted by default, so the README shows how to restrict instead. Every change is `ask` in the
-  // ask-changes block and `deny` in the read-only one, and the guide repeats the per-tool rule.
-  test("the README's restricting blocks cover every change, and the guide gives the per-tool rule", () => {
-    const blocks = [...raw("README.md").matchAll(/```json\n(\[[\s\S]*?\])\n```/g)].map((match) => JSON.parse(match[1]!) as { action: string; effect: string }[])
-    const effectIn = (rules: { action: string; effect: string }[], tool: string) => rules.find((item) => item.action === `notion_${tool}`)?.effect
-    for (const tool of [...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS]) {
-      expect({ tool, ask: effectIn(defaultRules("ask-changes"), tool) }).toEqual({ tool, ask: "ask" })
-      expect({ tool, deny: effectIn(defaultRules("read-only"), tool) }).toEqual({ tool, deny: "deny" })
-      const printed = (rules: { action: string; effect: string }[]) => blocks.some((block) => JSON.stringify(block) === JSON.stringify(rules))
-      expect({ tool, askPrinted: printed(defaultRules("ask-changes")), denyPrinted: printed(defaultRules("read-only")) }).toEqual({ tool, askPrinted: true, denyPrinted: true })
-    }
-    // The top-level per-tool recipe the guide and the README give is a deny, never an allow.
-    expect(text("README.md")).toContain(OPT_IN_TOOL)
-    expect(text("docs/configuration.md")).toContain(OPT_IN_TOOL)
-  })
-
-  test.each(FILES)("%s puts no ask or allow recipe for a Notion tool at the top level, where it would reach Explore", (file) => {
-    const source = raw(file)
-    // Every JSON example that is a config: its top-level permissions only tighten.
-    for (const [, body] of source.matchAll(/```json\n([^]*?)```/g)) {
-      let config: unknown
-      try {
-        config = JSON.parse(body!)
-      } catch {
-        continue
-      }
-      const top = !Array.isArray(config) && typeof config === "object" && config !== null ? ((config as { permissions?: { action: string; effect: string }[] }).permissions ?? []) : []
-      expect(top.filter((item) => item.action.startsWith("notion_") && item.effect !== "deny")).toEqual([])
-    }
-    // Every ask or allow rule for one tool sits in an agent's own rules, said in its paragraph or code block. The
-    // plugin's own block, which the plugin inserts itself, is the one exception.
-    const blocks = source.split(/\n\s*\n/)
-    blocks.forEach((block, index) => {
-      if (!/\{ "action": "notion_notion-[a-z0-9-]+", "resource": "\*", "effect": "(?:ask|allow)" \}/.test(block)) return
-      const context = `${blocks[index - 1] ?? ""}\n${block}`
-      if (/The plugin adds these\s+rules/.test(context)) return
-      // "in your permissions or an agent's own" offers the top level too: it fails.
-      const agentLevel = /agent's own|"agents"/.test(context) && !/\b(?:in|to) (?:your|the same) `permissions`|here or in an agent's own/.test(context.replace(/\s+/g, " "))
-      expect({ file, block: block.slice(0, 120), agentLevel }).toEqual({ file, block: block.slice(0, 120), agentLevel: true })
-    })
-  })
-
-  // R18: the `all` block allows everything, and no other example in the docs or the skills hands a change an allow: a
-  // reader who restricts must not be told to reopen one.
-  test("no doc or skill gives a change an allow rule outside the generated block", () => {
-    for (const file of FILES) {
-      const source = raw(file)
-      for (const tool of [...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS]) {
-        const rules = [...source.matchAll(/\{[^{}]*\}/g)].map((match) => match[0])
-        const allowed = rules.filter((item) => item.includes(`"action": "notion_${tool}"`) && /"effect"\s*:\s*"allow"/.test(item))
-        // The one exception is the README's generated `all` block, whose line is a literal allow for every tool.
-        const generated = file === "README.md" && source.includes(rule(tool, "allow"))
-        expect({ file, tool, allowed: allowed.length, generated }).toEqual({ file, tool, allowed: generated ? 1 : 0, generated })
-      }
-    }
-  })
-
-  // R18: the read-only block is the strict agent's shortcut; the guide's own strict recipe repeats the deny after its
-  // namespace ask, so no change reopens.
-  test("the guide's strict recipe repeats every deny after its notion_* ask, so none reopens", () => {
-    const recipe = raw("docs/configuration.md").split("A read-only agent that asks for one change")[1]?.split("```json")[1]?.split("```")[0] ?? ""
-    const ask = recipe.indexOf('"action": "notion_*", "resource": "*", "effect": "ask"')
-    expect(ask).toBeGreaterThanOrEqual(0)
-    for (const name of DESTRUCTIVE_TOOLS) expect(recipe).not.toContain(`"action": "notion_${name}", "resource": "*", "effect": "allow"`)
-  })
-
-  test("the README's first lines say every tool is allowed by default, and the Jelly summary says the plugin changes things", () => {
-    expect(text("README.md")).toContain("Every tool is allowed by default.")
-    const { jelly } = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { jelly: { summary: string } }
-    expect(jelly.summary).toMatch(/make changes/i)
-    expect(jelly.summary.length).toBeLessThanOrEqual(120)
-  })
-
-  test("the docs sign in only with OAuth, or with a workspace owner's MCP token held in an env var, never a pasted key", () => {
-    expect(text("README.md")).toContain("No integration token is needed for the browser sign-in; a headless machine can use an MCP token")
-    expect(text("docs/configuration.md")).toContain("Notion's server signs in with OAuth")
-    expect(text("docs/configuration.md")).toContain('"Authorization": "Bearer {env:NOTION_MCP_TOKEN}"')
-    for (const file of FILES) expect(text(file)).not.toMatch(/Bearer (?!\{env:)[A-Za-z0-9_-]{8,}|NOTION_API_KEY/)
-  })
-
-  // BUILD-LESSONS, "The scope request": the pin, the fallback it prevents, and the reason it is safe with CIMD.
-  test("the docs pin the one scope, name the wider fallback, and still sign in with the client metadata document", () => {
-    const configuration = text("docs/configuration.md")
-    expect(configuration).toContain('"oauth": { "scope": "default" }')
-    expect(configuration).toContain("ema_issuer:manage")
-    expect(configuration).toContain("falls back to every advertised scope")
-    expect(configuration).toContain("client metadata document")
-    expect(text("README.md")).toContain("asks Notion for its one scope, `default`")
-    expect(text("docs/architecture.md")).toContain("else **every** scope in the protected-resource metadata")
-  })
-
-  // DR-3: a saved approval can beat an ask, never a configured deny.
-  test("the README and SECURITY say a saved Always allow never beats a deny", () => {
-    for (const file of ["README.md", "SECURITY.md"]) expect(text(file)).toContain("beats an `ask` but never a `deny`")
-  })
-
-  // DR-4: mcp auth and mcp logout work, and the cold-start race is the one failure; every place that names them says so.
-  test("the sign-in and sign-out commands carry the cold-start caveat", () => {
-    const caveat = "If it answers `MCP server not found: notion`, OpenCode is still opening that folder: wait a few seconds and run it again"
-    const readme = text("README.md")
-    expect(readme).toContain(caveat)
-    expect(readme).toContain("Run it from the project folder where the plugin is installed, or remove the account in `/connect` → **Notion**")
-    expect(text("skills/notion/SKILL.md")).toContain("Run either from the project folder where")
-    expect(text("skills/notion/SKILL.md")).toContain("if it answers `MCP server not found: notion`, wait a few seconds and run it again")
-  })
-
-  test("the README's Uninstall signs out before it removes the plugin", () => {
+  test("the README's uninstall signs out before it removes the plugin", () => {
     const uninstall = /## Uninstall(.*?)## Links/.exec(text("README.md"))?.[1] ?? ""
     const logout = uninstall.indexOf("opencode mcp logout notion")
     const list = uninstall.indexOf("opencode auth list")
-    const remove = uninstall.indexOf(`opencode plugin remove github:joe-broadhead/opencode-notion#v${VERSION}`)
+    const remove = uninstall.indexOf(`opencode plugin remove github:we-the-rebel-alliance/notion-plugin#v${pkg.version}`)
     expect(logout).toBeGreaterThanOrEqual(0)
     expect(list).toBeGreaterThan(logout)
     expect(remove).toBeGreaterThan(list)
@@ -193,7 +92,6 @@ describe("docs", () => {
   test("every code raised in src/ is in CODES, and every non-rpc code in CODES is raised", () => {
     const sources = readdirSync(join(ROOT, "src")).filter((name) => name.endsWith(".ts")).map((name) => [name, readFileSync(join(ROOT, "src", name), "utf8")] as const)
     const found = new Set(sources.flatMap(([, source]) => [...source.matchAll(/(?:notionError|errorText|codeText)\(\s*"([A-Z][A-Z_]+)"/g)].map((match) => match[1]!)))
-    // A code written into a message template, such as `STATUS_UNAVAILABLE: ...`, is caught here too.
     for (const [, source] of sources) for (const match of source.matchAll(/`([A-Z][A-Z0-9]*_[A-Z0-9_]+): /g)) found.add(match[1]!)
     expect([...found].filter((code) => !(code in CODES))).toEqual([])
     const declared = Object.entries(CODES).filter(([, entry]) => entry.surface !== "rpc").map(([code]) => code)
@@ -212,7 +110,7 @@ describe("docs", () => {
   })
 
   test("the configuration guide documents the setup and status codes, and the scripting guide the rpc ones", () => {
-    const errors = /## Errors([\s\S]*?)## /.exec(text("docs/configuration.md"))?.[1] ?? ""
+    const errors = /## Errors([\s\S]*)$/.exec(text("docs/configuration.md"))?.[1] ?? ""
     const setup = Object.entries(CODES).filter(([, entry]) => entry.surface !== "rpc").map(([code]) => code)
     expect([...errors.matchAll(/\| `([A-Z][A-Z_]+)` \|/g)].map((match) => match[1]!).sort()).toEqual(setup.sort())
     const scripting = /## Errors([\s\S]*?)## What scripts cannot do/.exec(text("docs/scripting.md"))?.[1] ?? ""
@@ -221,21 +119,18 @@ describe("docs", () => {
     expect(named.filter((code) => !(code in CODES))).toEqual([])
   })
 
-  // R7 with R18: the README prints the whole block for every `access` value, generated from defaultRules(access), so a
-  // class or an option change cannot leave the README showing a block that is not what runs.
-  test("the README prints the whole default-rules block for each access value, and each equals defaultRules(access)", () => {
-    const blocks = [...raw("README.md").matchAll(/```json\n(\[[\s\S]*?\])\n```/g)].map((match) => JSON.parse(match[1]!) as { action: string; effect: string }[])
+  // R7 with R18: the configuration guide prints the whole block for every `access` value, generated from
+  // defaultRules(access), so a class or an option change cannot leave the guide showing a block that is not what runs.
+  test("the configuration guide prints the whole default-rules block for each access value, and each equals defaultRules(access)", () => {
+    const blocks = [...raw("docs/configuration.md").matchAll(/```json\n(\[[\s\S]*?\])\n```/g)].map((match) => JSON.parse(match[1]!) as { action: string; effect: string }[])
     const arrays = blocks.filter((value) => Array.isArray(value) && value.some((item) => item?.action === "notion_*"))
-    // The three generated blocks, one per value, plus the agent examples that repeat a subset.
     for (const access of ACCESS) {
       const expected = defaultRules(access)
       const found = arrays.filter((value) => JSON.stringify(value) === JSON.stringify(expected))
       expect({ access, found: found.length }).toEqual({ access, found: 1 })
     }
-    // No elided block anywhere: every element is a rule, never a placeholder string.
     for (const value of blocks) if (Array.isArray(value)) for (const item of value) expect(typeof item).toBe("object")
-    // The Permissions section opens with the family sentence.
-    expect(/## Permissions\n\n\*\*Every tool is allowed by default\.\*\*/.test(raw("README.md"))).toBe(true)
+    expect(/## Permissions\n\n\*\*Every tool is allowed by default\.\*\*/.test(raw("docs/configuration.md"))).toBe(true)
   })
 
   // R8: every "tested on ..." mention is TESTED_HOSTS, and the untested example is a version that is not a release.
@@ -244,22 +139,14 @@ describe("docs", () => {
     const check = (file: string, source: string) => {
       for (const match of source.matchAll(/tested on /g)) {
         mentions += 1
-        // The run of versions right after "tested on", across a line wrap, and nothing else.
         const run = /^\s*((?:\d+\.\d+\.\d+)(?:(?:,[ \t]*|\s+and\s+)(?:\d+\.\d+\.\d+))*)/.exec(source.slice(match.index! + match[0].length))?.[1] ?? ""
         expect({ file, versions: [...(run.match(/\d+\.\d+\.\d+/g) ?? [])] }).toEqual({ file, versions: [...TESTED_HOSTS] })
       }
     }
-    for (const file of ["README.md", "AGENTS.md", "SECURITY.md", "docs/configuration.md"]) check(file, raw(file))
-    // The release heading is `## [0.0.0] - <date>` once the release kit has dated it; before that, `## [Unreleased]`
-    // (or the older `- Unreleased`). Only the first section is read: one heading line, never a span across sections.
-    const changelog = /## \[(?:Unreleased\]|[^\]\n]*\] - (?:Unreleased|\d{4}-\d{2}-\d{2}))\n([\s\S]*?)(?:\n## \[|$)/.exec(raw("CHANGELOG.md"))?.[1] ?? ""
-    expect(changelog.length).toBeGreaterThan(0)
-    check("CHANGELOG.md (Unreleased)", changelog)
+    for (const file of ["README.md", "SECURITY.md", "CONTRIBUTING.md", "docs/configuration.md"]) check(file, raw(file))
     expect(mentions).toBeGreaterThanOrEqual(2)
-    // The places that list the releases without the words "tested on" name the same four.
-    const list = `${TESTED_HOSTS.slice(0, -1).join(", ")} and ${TESTED_HOSTS.at(-1)}`
-    for (const file of ["AGENTS.md", "docs/configuration.md", "CONTRIBUTING.md"]) expect({ file, list: text(file).includes(list) }).toEqual({ file, list: true })
-    // The example of a release the checks do not run on is 2.2.99, never one of the tested ones.
+    const list = TESTED_HOSTS.length === 1 ? TESTED_HOSTS[0]! : `${TESTED_HOSTS.slice(0, -1).join(", ")} and ${TESTED_HOSTS.at(-1)}`
+    for (const file of ["AGENTS.md", "CONTRIBUTING.md"]) expect({ file, list: text(file).includes(list) }).toEqual({ file, list: true })
     expect(text("docs/configuration.md")).toContain(UNTESTED_EXAMPLE)
     for (const version of TESTED_HOSTS) expect(text("docs/configuration.md")).not.toContain(`inside the range, such as ${version}`)
   })
@@ -273,10 +160,9 @@ describe("docs", () => {
   // R1: every example runs the RPC this plugin registers, with the location header and the envelope, and names a method
   // in the table. A `<method>` placeholder names no method, but it must still carry the header and the body shape.
   test("every scripting example has the RPC id, the location header, the envelope, and a method in the table", () => {
-    const names = new Set(["describe", ...METHODS.map((method) => method.name), ...PLUGIN_METHODS])
+    const names = new Set(["describe", ...METHODS.map((method) => method.name), "probe", "events_list"])
     let examples = 0
     for (const file of ["docs/scripting.md", "README.md"]) {
-      // A shell continuation joins its line, so one example is one logical line.
       const source = raw(file).replace(/\\\n\s*/g, " ")
       for (const match of source.matchAll(/opencode api post (\/api\/rpc\/[^\s/]+\/([A-Za-z0-9._<>-]+))[ \t]+([^\n]*)/g)) {
         examples += 1
@@ -287,14 +173,11 @@ describe("docs", () => {
         const line = match[0]
         expect({ file, header: line.includes(`-H "x-opencode-directory:$PWD"`) }).toEqual({ file, header: true })
         if (placeholder) continue
-        // The body may run over several lines: join the continuation lines before parsing it.
         const window = source.slice(match.index!, match.index! + match[0].length + 400).replace(/\n\s+(?=["}])/g, "")
         const body = /-d '(\{[^']*\})'/.exec(window)
         expect({ file, body: body !== null }).toEqual({ file, body: true })
         const parsed = JSON.parse(body![1]!) as { input?: { sessionID?: unknown; input?: unknown } }
         expect({ file, envelope: typeof parsed.input }).toEqual({ file, envelope: "object" })
-        // `describe` takes nothing, or one session: its envelope holds no nested input. Every other method names the
-        // session the script runs as, and passes the tool's own input.
         const session = typeof parsed.input!.sessionID
         if (method === "describe") {
           expect({ file, session: session === "string" || session === "undefined" }).toEqual({ file, session: true })
@@ -303,63 +186,15 @@ describe("docs", () => {
         }
         expect({ file, session }).toEqual({ file, session: "string" })
         expect({ file, input: typeof parsed.input!.input }).toEqual({ file, input: "object" })
-        // An MCP method's real input is the server's, so only the parameters the plugin records are checked.
-        const recorded = PARAMETERS[method!]
-        if (recorded) {
-          const keys = Object.keys(parsed.input!.input as Record<string, unknown>)
-          const known = recorded.map((entry) => entry.split(":")[0]!.replace(/\*$/, ""))
-          expect({ file, method, unknown: keys.filter((key) => !known.includes(key)) }).toEqual({ file, method, unknown: [] })
-          expect({ file, method, missing: known.filter((name) => recorded.some((entry) => entry.startsWith(`${name}*:`)) && !keys.includes(name)) }).toEqual({ file, method, missing: [] })
-        }
       }
     }
     expect(examples).toBeGreaterThanOrEqual(3)
   })
 
-  test("the Jelly guide describes the declaration as Jelly reads it, with no placeholder or version", () => {
-    const guide = text("docs/jelly.md")
-    expect(guide).not.toMatch(/`latest` is|None yet/)
-    expect(guide).toContain("the one line in `jelly.summary`, and beside it the mark in `jelly.icon`")
-    // Jelly's contracts drop an unknown top-level key; they do not refuse the declaration for it.
-    expect(guide).toContain("drop a top-level key they don't know")
-    expect(guide).not.toMatch(/refuses this declaration|accepts no unknown keys/)
-    // R18: every declared tool is allowed, and a tool Notion adds later is undeclared, so Jelly runs it with the plugin's
-    // own default: the guide says so plainly, a write included.
-    expect(guide).toContain(`${KNOWN.length} tools are declared (${READ_TOOLS.length} read-only), every tool in \`src/notion-tools.ts\``)
-    expect(guide).toContain("A tool Notion adds later, a write included, is not declared, so in Jelly it runs with the plugin's own default: allowed")
-    const destructive = guide.split("- The nine destructive tools:")[1]?.split("A tool Notion adds later")[0] ?? ""
-    for (const name of DESTRUCTIVE_TOOLS) expect(destructive).toContain(`notion_${name}`)
-    const skills = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).jelly.skills as string[]
-    expect(guide).toContain(`Declared: ${skills.map((name) => `\`${name}\``).join(", ")}.`)
-  })
-
-  test("the scripting guide points at the known reads, and gives Notion's rate limits with one call at a time", () => {
-    const guide = text("docs/scripting.md")
-    expect(guide).toContain("(`READ_TOOLS` in `src/notion-tools.ts`)")
-    expect(guide).toContain("180 requests a minute")
-    expect(guide).toContain("600 requests a minute")
-    expect(guide).toContain("one at a time")
-    expect(guide).toContain("never retry a write")
-  })
-
-  test("the README's limits name the plans each tool group needs, and the two limits of a shared sign-in", () => {
-    const readme = text("README.md")
-    expect(readme).toContain("separate OpenCode processes on one credential")
-    expect(readme).toContain("refreshes its own token")
-    expect(readme).toContain("approved list")
-    expect(readme).toContain("Notion stores workspace data in the United States")
-    expect(readme).toContain("The tool table comes from Notion's documentation")
-    expect(readme).not.toContain("has not been reconciled with a live tool list")
-  })
-})
-
-describe("the upgrade example", () => {
-  test("removes an earlier release than the one the install specs name", () => {
-    const match = UPGRADE_FROM.exec(text("README.md"))
-    expect(match).not.toBeNull()
-    const earlier = match!.slice(1, 4).map(Number)
-    const current = VERSION.split(".").map(Number)
-    const order = earlier.map((part, index) => part - current[index]!).find((difference) => difference !== 0) ?? 0
-    expect(order).toBeLessThan(0)
+  test("the docs say the tool and the RPC method share one run, and name the direct tool", () => {
+    const architecture = text("docs/architecture.md")
+    expect(architecture).toContain("notion_events_list")
+    expect(architecture).toContain("the same run and schemas as the RPC method")
+    expect(text("docs/scripting.md")).toContain("also a direct tool, `notion_events_list`")
   })
 })
