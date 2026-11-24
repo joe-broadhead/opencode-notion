@@ -1,6 +1,6 @@
 ---
 name: notion
-description: "The user's Notion workspace: pages, docs, wikis, databases and trackers, comments and suggested edits, history and backlinks, files, Notion AI meeting notes, and sign-in. Not for Google Docs or Calendar (gws), recorded meetings (granola), or remembering things (Memory)."
+description: "The user's Notion workspace: pages, docs, wikis, databases and trackers, comments and suggested edits, history and backlinks, files, Notion AI meeting notes, and sign-in. Not for Google Docs or Calendar (gws), recorded meetings (granola), or remembering things (a collector)."
 ---
 If Notion's tools are absent, run `/connect` and choose Notion. An Enterprise admin may need to approve OpenCode first.
 # Notion

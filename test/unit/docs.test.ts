@@ -59,28 +59,34 @@ describe("docs", () => {
     expect(text(file)).not.toMatch(/provisional|not yet (?:checked|published|signed)|private package|TODO/i)
   })
 
-  test("there is no Jelly app guide, and no doc links to one", () => {
+  test("there is no legacy app guide, and no doc links to one", () => {
     expect(existsSync(join(ROOT, "docs", "jelly.md"))).toBe(false)
     for (const file of FILES) expect({ file, hit: text(file).includes("docs/jelly.md") }).toEqual({ file, hit: false })
   })
 
   test("the README covers install, sign-in, access and what the plugin adds, and points at the docs", () => {
     const readme = text("README.md")
-    expect(readme).toContain("github:we-the-rebel-alliance/notion-plugin#v0.0.0")
+    expect(readme).toContain("Install from a release: `opencode plugin add github:we-the-rebel-alliance/notion-plugin#v<version>`. The first release on plugin-contract is v0.0.0 (phase 4b).")
     expect(readme).toContain("Run `/connect`, choose **Notion**")
     expect(readme).toContain("**Every tool is allowed by default.**")
     expect(readme).toContain("tools[\"notion\"][\"notion-search\"]")
     expect(readme).toContain("`notion_events_list`")
-    expect(readme).toContain("Not for Google Docs or Google Calendar (use the gws plugin), recorded meetings (granola), or remembering things across\nsessions (Memory).".replace("\n", " "))
+    expect(readme).toContain("Not for Google Docs or Google Calendar (use the gws plugin), recorded meetings (granola), or remembering things across\nsessions (a collector).".replace("\n", " "))
     expect(readme).toContain("Notion Memory")
     expect(readme).toContain("docs/configuration.md")
+  })
+
+  test.each(FILES)("%s installs only from a release tag", (file) => {
+    for (const match of text(file).matchAll(/opencode plugin add (github:we-the-rebel-alliance\/notion-plugin[^\s`"]*)/g)) {
+      expect({ file, spec: match[1] }).toEqual({ file, spec: expect.stringContaining("#v") })
+    }
   })
 
   test("the README's uninstall signs out before it removes the plugin", () => {
     const uninstall = /## Uninstall(.*?)## Links/.exec(text("README.md"))?.[1] ?? ""
     const logout = uninstall.indexOf("opencode mcp logout notion")
     const list = uninstall.indexOf("opencode auth list")
-    const remove = uninstall.indexOf(`opencode plugin remove github:we-the-rebel-alliance/notion-plugin#v${pkg.version}`)
+    const remove = uninstall.indexOf("opencode plugin remove github:we-the-rebel-alliance/notion-plugin#v<version>")
     expect(logout).toBeGreaterThanOrEqual(0)
     expect(list).toBeGreaterThan(logout)
     expect(remove).toBeGreaterThan(list)

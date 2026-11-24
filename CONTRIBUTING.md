@@ -37,7 +37,7 @@ npm run check
 | Stage | What it does |
 | --- | --- |
 | `typecheck` | `tsc --noEmit` over `src/` and `test/`, strict, with unused names as errors |
-| `unit` | `bun test ./test/unit`: every module in `src/`, the docs' counts and error table, the model-text budgets and the Jelly declaration |
+| `unit` | `bun test ./test/unit`: every module in `src/`, the docs' counts and error table, the model-text budgets and the legacy declaration |
 | `conformance` | `npm run conformance`: the source contract's conformance kit over the pages source, against the fake Notion in `test/support/fake-notion.ts`; writes `reports/conformance-report.json` and fails unless it is ok |
 | `kit` | `node --test scripts/release-kit.test.mjs`: the copied release kit's own tests |
 | `build` | `node scripts/build.mjs`: deletes `dist/` and bundles `src/index.ts` and `src/tui.ts` with esbuild into the self-contained `dist/index.js` and `dist/tui.js` |
@@ -45,7 +45,7 @@ npm run check
 | `host` | builds, then `bun test ./test/host`: the plugin inside an embedded OpenCode 2.4.1 host from the locked `@opencode/sdk` |
 | `pack` | `bun test ./test/pack`: builds, packs and installs the package, imports both entry points, and loads it in stock OpenCode 2.4.1 |
 | `forbidden` | `node scripts/check-forbidden.mjs`: scans `src/`, `test/`, `scripts/` and `dist/` for forbidden APIs and machine-local paths |
-| `copies` | `node scripts/check-copies.mjs`: the declaration test kit, Jelly's setting rules and the release kit's files match the copies every plugin carries |
+| `copies` | `node scripts/check-copies.mjs`: the declaration test kit, the legacy setting rules and the release kit's files match the copies every plugin carries |
 | `lint:actions` | `actionlint` over the workflows, when it is on PATH |
 | `whitelist` | Checks `package.json` against the approved package shape, and that `dist/` holds exactly `index.js` and `tui.js` |
 

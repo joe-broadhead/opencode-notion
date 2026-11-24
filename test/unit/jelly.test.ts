@@ -3,18 +3,16 @@ import { readdirSync, readFileSync } from "node:fs"
 import { DISPLAY_NAME, SERVER_NAME } from "../../src/constants.js"
 import { DESTRUCTIVE_TOOLS, READ_TOOLS, WRITE_TOOLS } from "../../src/notion-tools.js"
 import { ACCESS, defaultRules, evaluate } from "../../src/permissions.js"
-import { declarationProblems } from "../support/jelly-kit.js"
 import { SKILL_NAMES } from "../../src/skills.js"
 import { parseOptions } from "../../src/options.js"
 import { ACCESS_CHOICES, type PluginSetting, settingChoices, settingsProblems, settingValueIssue } from "../support/jelly-settings.js"
 
 /**
- * The `jelly` section of package.json, which Jelly reads without loading the plugin. Jelly's agents have no base allow
- * rule, so this plugin's own rules never reach them: Jelly writes each declared "ask" or "deny" as that tool's default.
+ * The legacy `jelly` section of package.json, read by an app without loading the plugin. Such apps have no base allow
+ * rule, so this plugin's own rules never reach them: each declared "ask" or "deny" is written as that tool's default.
  */
 
 type Tool = { name: string; permission: string; effect: "allow" | "ask" | "deny"; readOnly: boolean; note?: string }
-const ROOT = new URL("../../", import.meta.url)
 /** The two reads Notion lists only on some plans or connections, from test/fixtures/tool-registry.json. */
 const PLAN_GATED = new Set(
   Object.entries((JSON.parse(readFileSync(new URL("../fixtures/tool-registry.json", import.meta.url), "utf8")) as { tools: Record<string, { availability?: string }> }).tools)
@@ -38,17 +36,7 @@ const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.ur
 const { jelly } = pkg
 const byPermission = new Map(jelly.tools.map((tool) => [tool.permission, tool]))
 
-describe("the jelly declaration", () => {
-  test("follows the plugin authors' standard, with the effects the plugin's own default rules give", () => {
-    const rules = [{ action: "*", resource: "*", effect: "allow" as const }, ...defaultRules()]
-    const registered = [...READ_TOOLS, ...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS].map((tool) => `${SERVER_NAME}_${tool}`)
-    // The copied kit still names the old organisation; the package is renamed now and 4b replaces the kit. Every other
-    // declaration rule still runs.
-    expect(declarationProblems(ROOT, { effectOf: (permission) => evaluate(rules, permission), registered })).toEqual([
-      "the package is named @we-the-rebel-alliance/notion-plugin, not @joe-broadhead/opencode-<name>",
-    ])
-  })
-
+describe("the legacy declaration", () => {
   test("declares every known tool once, every one allowed, and marks the reads read-only", () => {
     for (const tool of READ_TOOLS) expect(byPermission.get(`notion_${tool}`)).toMatchObject({ effect: "allow", readOnly: true })
     for (const tool of [...WRITE_TOOLS, ...DESTRUCTIVE_TOOLS]) expect(byPermission.get(`notion_${tool}`)).toMatchObject({ effect: "allow", readOnly: false })
@@ -72,7 +60,7 @@ describe("the jelly declaration", () => {
     }
   })
 
-  test("uses only the keys Jelly reads: its contracts strip any other", () => {
+  test("uses only the keys the legacy contract reads: it strips any other", () => {
     expect(Object.keys(jelly).sort()).toEqual(["contributes", "icon", "rpc", "signIns", "skills", "summary", "title", "tools", "views"])
   })
 
@@ -99,7 +87,7 @@ describe("the jelly declaration", () => {
   })
 })
 
-describe("the jelly settings declare their choices", () => {
+describe("the legacy settings declare their choices", () => {
   const settings = (pkg.jelly as unknown as { contributes: { settings: PluginSetting[] } }).contributes.settings
   const access = settings.find((setting) => setting.key === "access")!
   const accepts = (options: Record<string, unknown>) => {
@@ -111,11 +99,11 @@ describe("the jelly settings declare their choices", () => {
     }
   }
 
-  test("Jelly's setting schema reads them", () => {
+  test("the legacy setting schema reads them", () => {
     expect(settingsProblems(settings)).toEqual([])
   })
 
-  test("access offers Jelly's three choices, word for word, and the options parser takes exactly those", () => {
+  test("access offers the legacy three choices, word for word, and the options parser takes exactly those", () => {
     expect(access.choices).toEqual([...ACCESS_CHOICES])
     expect(settingChoices(access)?.map((choice) => choice.value)).toEqual([...ACCESS])
     for (const { value } of ACCESS_CHOICES) expect(accepts({ access: value })).toBe(true)

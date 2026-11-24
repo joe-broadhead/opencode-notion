@@ -22,9 +22,9 @@ project.
   `oauth` is `false`; it never reads, copies or reports its `headers`, which may hold an MCP token. Status shows server
   URLs without their query strings, never OpenCode's text for a needed sign-in, which can hold an authorization URL, and
   cuts a connection failure's reason to one line with no URL credentials, query or token.
-- The workspace name and connection type come from the last `notion-get-self` result the model or a script asked for, and
-  are kept in memory only. Nothing else of that result is read: no user name, email or ID, no workspace ID, and not the
-  icon.
+- The workspace name and connection type come from the last `events_list` or `probe` read, or a script's
+  `notion-get-self` call, and are kept in memory only. Nothing else of that result is read: no user name, email or ID, no
+  workspace ID, and not the icon.
 - **Workspace content is other people's data.** Pages, databases, comments, files, meeting notes and calendar entries
   reach the model as tool results, and the agent sends them to your model provider, like any other tool result in the
   session. Notion acts with the permissions of the person who signed in. Notion stores workspace data in the United
@@ -70,9 +70,9 @@ Things to know:
 - **Some agents get no default rules.** Agents defined only in your own config, and agents added by plugins that load
   after this one, are created after the plugin inserts its rules, and agents without a base allow get none. Under the
   default `access: "all"` that changes nothing; under `ask-changes` or `read-only` those agents stay unrestricted.
-  `/notion-status` names them and gives the fix: put the block it shows first in that agent's own `permissions`, followed
-  by your top-level rules for Notion tools. Do not put an `ask` or an `allow` in the top-level `permissions`, which would
-  loosen Explore.
+  Under those two values `/notion-status` names them and gives the fix: put the block it shows first in that agent's own
+  `permissions`, followed by your top-level rules for Notion tools. Do not put an `ask` or an `allow` in the top-level
+  `permissions`, which would loosen Explore.
 - **Unattended runs refuse prompts.** In `opencode run`, a Notion tool that would ask is refused.
 - **The `notion_*` rule also matches other servers** whose names start with `notion_`. For their tools it only adds
   prompts.

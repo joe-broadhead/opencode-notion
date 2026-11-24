@@ -37,8 +37,8 @@ decide what its model sees: the agent's rules, then the session's, and the last 
   session's rules, so a script that relied on one needs an `allow` for its action in the session's or the agent's rules.
 - **A script gets the same default.** Under `access: "all"` the block allows every method, so a script that names an
   agent with the default rules can call a read or a change with nothing more. Set `access: "ask-changes"` or
-  `"read-only"`, or narrow the session's own rules, when a script should not change anything. An agent defined only in
-  your config gets no default rules; `/notion-status` names it.
+  `"read-only"`, or narrow the session's own rules, when a script should not change anything. Under `ask-changes` or
+  `read-only`, an agent defined only in your config gets no default rules; `/notion-status` names it.
 
 Create the session once, with the agent the script runs as, and keep its id. Give the project as the session's
 `location`: a session made without one belongs to the service's default location, where the project's agents may not
@@ -172,5 +172,5 @@ OpenCode itself answers `rpc.method_not_found` for a method that does not exist,
 - Use a token or key: the plugin has none to give.
 
 A script's calls write nothing to the session, and OpenCode's `execute.before` and `execute.after` tool hooks, from any
-plugin, do not run for them. The plugin applies the same result shaping it applies on the model path: a script's account
-read fills the workspace and connection type for status, as the model's call does.
+plugin, do not run for them. A script's account read fills the workspace and connection type for status; a model's own
+`notion-get-self` call is not observed and does not update status.

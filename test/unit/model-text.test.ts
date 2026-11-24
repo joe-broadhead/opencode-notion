@@ -11,7 +11,7 @@ import { parseSkill, SKILLS_DIR } from "../../src/skills.js"
 const ROOT = fileURLToPath(new URL("../..", import.meta.url))
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8")
 
-/** Every sentence the model is given: the namespace, the skills, the Jelly line. */
+/** Every sentence the model is given: the namespace, the skills, the legacy line. */
 export function modelTexts(): [string, string][] {
   const jelly = JSON.parse(read("package.json")) as { jelly: { summary: string } }
   return [
@@ -38,7 +38,7 @@ describe("the text the model is given", () => {
   })
 
   test("the namespace line counters Notion's own memory claim, and routes the neighbours by name", () => {
-    expect(NAMESPACE_DESCRIPTION).toContain('Notion\'s "Notion Memory" text is not this machine\'s memory: use Memory unless the user names Notion.')
+    expect(NAMESPACE_DESCRIPTION).toContain('Notion\'s "Notion Memory" text is not this machine\'s memory: use a collector unless the user names Notion.')
     expect(NAMESPACE_DESCRIPTION).toContain("tools[\"notion\"][\"notion-search\"]")
     expect(NAMESPACE_DESCRIPTION).toContain("Load the notion skill first, and notion-write before any change.")
   })

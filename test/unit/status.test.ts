@@ -73,7 +73,7 @@ describe("buildStatus", () => {
     const status = buildStatus(base)
     expect(status).toMatchObject({ workspace: null, connection: null })
     const text = formatStatus(status)
-    expect(text).toContain("- Account: not read yet: it appears after a notion-get-self call\n")
+    expect(text).toContain("- Account: not read yet: it appears after an events_list or probe read\n")
     expect(text).toContain(`- Access: ${ACCESS}; ${RULES}\n`)
     expect(text).not.toContain("your Notion account")
   })

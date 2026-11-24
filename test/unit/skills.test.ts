@@ -86,7 +86,7 @@ describe("skills", () => {
 
   test("the descriptions route Notion's pages here, and other systems, recordings and changes elsewhere", () => {
     expect(description("notion")).toContain("The user's Notion workspace: pages, docs, wikis, databases and trackers")
-    expect(description("notion")).toContain("Not for Google Docs or Calendar (gws), recorded meetings (granola), or remembering things (Memory).")
+    expect(description("notion")).toContain("Not for Google Docs or Calendar (gws), recorded meetings (granola), or remembering things (a collector).")
     expect(description("notion-write")).toContain("Before any Notion change: create or edit a page")
     for (const name of NAMES) expect(description(name)).not.toMatch(/\bpost to Slack\b|\bschedule a meeting\b/i)
   })

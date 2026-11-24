@@ -137,6 +137,13 @@ describe(`the plugin on OpenCode ${HOST_VERSION}`, () => {
     expect(commands.map((command) => command.name)).toContain("notion-status")
   })
 
+  // OpenCode 2.4.1 probes a server with no `protocol` with `server/discover` first; this fake declines it, so the
+  // connection falls back to `initialize`.
+  test("a server with no protocol is probed with server/discover before initialize", () => {
+    expect(host.fake.methods).toContain("server/discover")
+    expect(host.fake.methods.indexOf("server/discover")).toBeLessThan(host.fake.methods.indexOf("initialize"))
+  })
+
   test("P1: the rules sit right after the base allow in every built-in agent, once", async () => {
     const rules = await agentRules(host)
     for (const id of BUILT_IN) {
@@ -305,7 +312,7 @@ describe(`the plugin on OpenCode ${HOST_VERSION}`, () => {
     const text = await status(host, await session(host))
     expect(text).toContain(`- Connection: connected (${host.fake.url}, registered by this plugin)`)
     // No account read yet, so no workspace name.
-    expect(text).toContain("- Account: not read yet: it appears after a notion-get-self call\n")
+    expect(text).toContain("- Account: not read yet: it appears after an events_list or probe read\n")
     // A host with a config-only agent still names it under the restricting values; this host runs the default `all`.
     expect(text).toContain("- Access: access all: every Notion tool is allowed, reads and changes alike; every agent has the block\n")
     // Notion's own sign-in metadata calls the server beta; status says so wherever it runs.
@@ -323,11 +330,10 @@ describe(`the plugin on OpenCode ${HOST_VERSION}`, () => {
     expect(host.fake.calls.slice(before)).toEqual([])
   })
 
-  test("the account comes from a notion-get-self the model or a script asked for, never a call of the plugin's", async () => {
+  test("the account comes from a script's notion-get-self, never a call of the plugin's", async () => {
     expect(await statusRpc(host)).toMatchObject({ workspace: null, connection: null })
     const sessionID = await session(host)
-    // The tools RPC's executor skips execute.after, so its result shaping records the account; the model path's hook
-    // does the same for a model turn, which account.test.ts covers.
+    // The tools RPC's result shaping records the account; the plugin registers no model-path hook.
     expect(JSON.parse(await scriptCall(host, "notion-get-self", { sessionID, input: {} }))).toHaveProperty("output")
     const output = await until("status reads the workspace", async () => {
       const current = await statusRpc(host)
@@ -706,7 +712,12 @@ describe("a server that asks for a sign-in", () => {
     host.fake.challenge = true
     const mcp = host.client.mcp as unknown as Record<"connect" | "disconnect", (input: object) => Promise<unknown>>
     await mcp.disconnect({ server: "notion", location: host.location })
+    const before = host.fake.methods.length
     await mcp.connect({ server: "notion", location: host.location }).catch(() => {})
+    // A 401 from the discovery probe ends the attempt: no initialize follows.
+    const attempt = host.fake.methods.slice(before)
+    expect(attempt).toContain("server/discover")
+    expect(attempt).not.toContain("initialize")
     const server = await until("the server needs a sign-in", async () => {
       const { data } = await host.client.mcp.list({ location: host.location })
       const found = data.find((item) => item.name === "notion")

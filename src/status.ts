@@ -28,7 +28,7 @@ interface SkillPath {
 export interface StatusFacts {
   readonly server?: { readonly status: "connected" | "pending" | "disabled" | "failed" | "needs_auth"; readonly error?: string }
   readonly source?: ServerSource
-  /** The workspace and connection type from the last `notion-get-self` result since OpenCode started. */
+  /** The workspace and connection type from the last `events_list` or `probe` read since OpenCode started. */
   readonly account?: Account
   /**
    * True when this status read found the server needing a new sign-in while a workspace from an earlier call was still
@@ -273,7 +273,7 @@ export function formatStatus(status: Status) {
   return [
     "Notion status",
     `- Connection: ${STATE_TEXT[status.state]}${details ? ` (${details})` : ""}`,
-    `- Account: ${status.workspace ?? "not read yet: it appears after a notion-get-self call"}`,
+    `- Account: ${status.workspace ?? "not read yet: it appears after an events_list or probe read"}`,
     `- Access: ${accessText(status)}`,
     `- Server: ${status.beta ? "Notion MCP (Beta): Notion may change its tools and behaviour" : "Notion MCP"}`,
     `- Tools: ${toolsText(status)}`,

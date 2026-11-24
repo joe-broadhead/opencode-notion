@@ -1,10 +1,11 @@
 # Configuration
 
-Every option is optional. The smallest setup is one entry in `plugins`:
+Every option is optional. Install from a release tag; the first release on plugin-contract is v0.0.0 (phase 4b). The
+smallest setup is one entry in `plugins`:
 
 ```json
 {
-  "plugins": [{ "package": "github:we-the-rebel-alliance/notion-plugin#v0.0.0" }]
+  "plugins": [{ "package": "github:we-the-rebel-alliance/notion-plugin#v<version>" }]
 }
 ```
 
@@ -12,7 +13,7 @@ To set options, use the object form:
 
 ```json
 {
-  "plugins": [{ "package": "github:we-the-rebel-alliance/notion-plugin#v0.0.0", "options": { "access": "ask-changes" } }]
+  "plugins": [{ "package": "github:we-the-rebel-alliance/notion-plugin#v<version>", "options": { "access": "ask-changes" } }]
 }
 ```
 
@@ -1365,10 +1366,11 @@ the three values.
 ]
 ```
 
-Rules in your own `permissions` come after the plugin's. A saved "Always allow" beats an `ask` but never a `deny`. An
-agent without a base allow, or an agent added by a plugin that loads after this one, gets no block; `/notion-status` names
-it and prints the rules to paste into that agent, followed by your top-level rules for Notion tools. Do not put an `ask`
-or an `allow` in the top-level `permissions`, which would loosen Explore.
+Rules in your own `permissions` come after the plugin's. A saved "Always allow" beats an `ask` but never a `deny`. Under
+`ask-changes` or `read-only`, an agent without a base allow, or an agent added by a plugin that loads after this one,
+gets no block; `/notion-status` names it and prints the rules to paste into that agent, followed by your top-level rules
+for Notion tools. Under the default `all` the block would add nothing, so no agent is named. Do not put an `ask` or an
+`allow` in the top-level `permissions`, which would loosen Explore.
 
 The plugin's own reads, `notion_events_list` and `notion_probe`, are allowed by the last two rules of every block,
 whatever `access` says.
@@ -1383,7 +1385,7 @@ whatever `access` says.
 | `state` | `connected`, `sign_in_required`, `connecting`, `failed`, `disabled`, `not_configured` or `conflict`. |
 | `access` | The option's value. |
 | `source` | The server's owner and URL: `plugin`, `adopted` or `conflict`. |
-| `workspace`, `connection` | The workspace name and whether the sign-in is a person or a workspace connection, or null before a `notion-get-self` result. |
+| `workspace`, `connection` | The workspace name and whether the sign-in is a person or a workspace connection, or null before an `events_list` or `probe` read. |
 | `tools`, `destructiveTools`, `unknownCount`, `unknownTools` | Notion's own tools that OpenCode lists, the destructive class, and the tools the plugin does not know. The plugin's own `notion_events_list` is not counted. |
 | `unguardedAgents` | Agents where a new Notion tool would run without asking. |
 | `host` | `version`, `range` and `tested` (true only for 2.4.1). |

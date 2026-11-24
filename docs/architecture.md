@@ -13,7 +13,7 @@ the tools RPC. It has no runtime dependencies: the source contract package it us
 | `src/index.ts` | The server part: the plugin `notion.workspace`, pointed at Notion's server |
 | `src/plugin.ts` | Setup, server registration or adoption, and the `notion_events_list` tool |
 | `src/integration.ts` | The `/connect` entry: its name "Notion", and the sign-in problem on its account |
-| `src/account.ts` | The workspace name and connection type from the model's own `notion-get-self` calls; when the server's status last changed |
+| `src/account.ts` | The workspace name and connection type from the plugin's own reads and the tools RPC; when the server's status last changed |
 | `src/options.ts` | Option parsing and validation |
 | `src/host-version.ts` | The host check: the supported range and the tested releases |
 | `src/notion-tools.ts` | `READ_TOOLS`, `WRITE_TOOLS`, `DESTRUCTIVE_TOOLS`, `PARAMETERS`, `PLUGIN_METHODS` and `classify()`: every fact the plugin keeps about Notion's tools. No runtime imports |
@@ -50,12 +50,13 @@ only typechecks. The package exports `.` (`dist/index.js`) and `./tui` (`dist/tu
    conflict: nothing is added, and status reports it.
 5. `ctx.tool.transform` gives the `notion` namespace its Code Mode description.
 6. `ctx.agent.transform` inserts the default rules after each agent's base `* * allow`.
-7. `watchAccount` registers one `execute.after` hook for `notion_notion-get-self` results, keeps the workspace name and
-   connection type in memory, and notes when the server's status last changes.
+7. `watchAccount` keeps the workspace name and connection type that the plugin's own reads (`events_list`, `probe`) and
+   the tools RPC record, in memory, and notes when the server's status last changes. It registers no per-request hook.
 8. `ctx.skill.transform`, `ctx.command.transform` (`/notion-status`) and `ctx.rpc.register` (`notion.workspace/status`).
 9. `registerToolsRpc` registers the tools RPC, `notion.workspace.tools`, with the known tools and the pages source's
    `events_list` and `probe`, and its `evaluate` hook.
-10. `registerEventsTool` adds `notion_events_list` to the `notion` namespace: the same run and schemas as the RPC method.
+10. `registerEventsTool` adds `notion_events_list` to the `notion` namespace, unless the user's `notion` entry is a
+    conflict: the same run and schemas as the RPC method.
 11. `watchIntegration` starts. Setup returns one cleanup that stops it, disposes the tools RPC and stops the account
     watcher.
 
@@ -68,8 +69,9 @@ succeeds.
 `notion`, without the plugin's own methods), every agent's rules (`ctx.agent.list()`) and the skills OpenCode lists
 (`ctx.skill.list()`). `buildStatus` turns them into one model, and `formatStatus` renders it in a fixed order: Connection,
 Account, Access, Server, Tools, Agents without default rules, OpenCode, and exactly one Next step. For 15 seconds after
-the server's status changes, no tools means "still listing". An agent is listed only when it has a base allow, lacks the
-plugin's whole block after it, and its own rules would let a new Notion tool run without asking. A skill of the plugin's
+the server's status changes, no tools means "still listing". Under `ask-changes` or `read-only`, an agent is listed only
+when it has a base allow, lacks the plugin's whole block after it, and its own rules would let a new Notion tool run
+without asking; under the default `all` no block is needed and none is listed. A skill of the plugin's
 id that OpenCode loads from another path is named. OpenCode's text for a needed sign-in is never shown, and a failure's
 reason is cut to one line of 160 characters with no URL query.
 
@@ -142,7 +144,7 @@ These facts are checked on OpenCode 2.4.1, the tested release. Links point to th
 | Refresh tokens | Notion rotates the refresh token on every use, and reusing one that has been rotated away revokes the whole grant. The host's refresh is serial, so one process is safe; two processes sharing one credential are not. | Notion's "Notion MCP OAuth specifics"; the host's token store |
 | MCP integrations | Integration ID `mcp_` + the first 16 hex digits of sha1(`<name>\0<url>`), so credentials are kept per name and URL. | [`mcp/index.ts`](https://github.com/anomalyco/opencode/blob/v2.4.1/packages/core/src/mcp/index.ts) |
 | Code Mode | MCP tools are in Code Mode by default. A tool name with a hyphen is not valid property syntax, so a call is `tools["notion"]["notion-search"]`. A declined prompt is an error the program can catch. Each tool's signature reaches the model; a tool's full description reaches it only through `search()`, so the skills name the tools they use. | [`codemode/tool.ts`](https://github.com/anomalyco/opencode/blob/v2.4.1/packages/core/src/codemode/tool.ts) |
-| Account capture | `ctx.tool.hook("execute.after", …)` sees the tool's id and its completed result. The plugin reads only `workspace.name` and `user.type` from a `notion-get-self` result, and keeps them in memory. The tools RPC's executor skips the hook, so `shapeResult` captures the same fields for a script's call. | The host test on 2.4.1 |
+| Account capture | The plugin's own reads (`events_list`, `probe`) call `captureAccount` after their `notion-get-self` read, and the tools RPC's `shapeResult` does the same for a script's call. Only `workspace.name` and `user.type` are kept, in memory. No `execute.after` hook is registered, so a model's direct `notion-get-self` call does not update status. | The host test on 2.4.1 |
 | Tool executors | `ctx.tool.list()` returns each MCP tool with a callable `execute`, which checks `<server>_<tool>` with the agent's and the session's rules and saved approvals. A deny is a `Tool.Error` with a cause; the server's `isError` is one without. `execute.before` and `execute.after` hooks do not run for it. | [`tool/mcp.ts`](https://github.com/anomalyco/opencode/blob/v2.4.1/packages/core/src/tool/mcp.ts) |
-| MCP server probe | A server entry with no `protocol` is probed with `server/discover` first, and a 401 ends the attempt: no `initialize` follows. The fake MCP server answers both. | The host test on 2.4.1 |
+| MCP server probe | A server entry with no `protocol` is probed with `server/discover` first, and a 401 ends the attempt: no `initialize` follows. The fake MCP server declines discovery with `-32601`, so a signed-in connection falls back to `initialize`; the host test asserts both sequences. | The host test on 2.4.1 |
 | RPC input | An RPC input given as a Standard Schema is validated with it; a plain JSON Schema is decoded with Effect, which drops unknown keys of an object that has properties. The package test checks the envelope. | `@opencode/core` 2.4.1, the RPC service's `parse` |
