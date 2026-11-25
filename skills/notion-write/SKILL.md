@@ -1,6 +1,6 @@
 ---
 name: notion-write
-description: Load before a Notion change: create or edit a page, database or view, comment, suggested edit, file, calendar event, move, duplicate, restore or delete. Every change is a pass-through tool of the signed-in account; confirm what it changes and whom it reaches.
+description: "Load before a Notion change: create or edit a page, database or view, comment, suggested edit, file, calendar event, move, duplicate, restore or delete. Every change is a pass-through tool of the signed-in account; confirm what it changes and whom it reaches."
 ---
 # Changes in Notion
 

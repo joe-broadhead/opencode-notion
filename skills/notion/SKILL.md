@@ -1,6 +1,6 @@
 ---
 name: notion
-description: Use a signed-in Notion account to search and read pages, databases, comments and files, list page edits, and report status. Not for another document service, recorded meetings, or remembering across sessions (a separate shared recall service owns that).
+description: "Use a signed-in Notion account to search and read pages, databases, comments and files, list page edits, and report status. Not for another document service, recorded meetings, or remembering across sessions (a separate shared recall service owns that)."
 ---
 # Notion
 

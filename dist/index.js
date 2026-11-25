@@ -6604,11 +6604,11 @@ function foldObjects(members2) {
     for (const key of object2.required ?? [])
       required2.add(key);
   }
-  const folded = { type: "object", properties };
+  const folded2 = { type: "object", properties };
   if (required2.size)
-    folded.required = [...required2];
+    folded2.required = [...required2];
   if (objects.every((object2) => object2.additionalProperties === false)) {
-    folded.additionalProperties = false;
+    folded2.additionalProperties = false;
   } else {
     const constraints = [];
     for (const object2 of objects) {
@@ -6617,11 +6617,11 @@ function foldObjects(members2) {
         constraints.push(constraint);
     }
     if (constraints.length === 1)
-      folded.additionalProperties = constraints[0];
+      folded2.additionalProperties = constraints[0];
     else if (constraints.length > 1)
-      folded.additionalProperties = { allOf: constraints };
+      folded2.additionalProperties = { allOf: constraints };
   }
-  return folded;
+  return folded2;
 }
 function foldIntersection(json2) {
   const allOf = json2.allOf;
@@ -6631,9 +6631,9 @@ function foldIntersection(json2) {
     if (key in json2)
       return;
   const unions = allOf.filter((m) => UNION_KEYS.some((k) => Array.isArray(m[k])));
-  let folded = null;
+  let folded2 = null;
   if (!unions.length) {
-    folded = foldObjects(allOf);
+    folded2 = foldObjects(allOf);
   } else {
     const union2 = unions[0];
     const keyword = UNION_KEYS.find((k) => Array.isArray(union2[k]));
@@ -6643,12 +6643,12 @@ function foldIntersection(json2) {
     const branches = union2[keyword].map((branch) => foldObjects([...rest, branch]));
     if (branches.some((b) => !b))
       return;
-    folded = { [keyword]: branches };
+    folded2 = { [keyword]: branches };
   }
-  if (!folded)
+  if (!folded2)
     return;
   delete json2.allOf;
-  assignProps(json2, folded);
+  assignProps(json2, folded2);
 }
 function finalize(ctx, schema) {
   const root = ctx.seen.get(schema);
@@ -12753,27 +12753,84 @@ var SKILLS_DIR = fileURLToPath(new URL("../skills/", import.meta.url));
 var SKILL_NAMES = ["notion", "notion-write"];
 var detail2 = (problem, name) => `The "${name}" skill was not loaded: skills/${name}/SKILL.md ${problem}`;
 var problemOf = (name, value) => `UNAVAILABLE: ${detail2(value, name)}. Next step: Reinstall the plugin.`;
+var unquote = (value) => value.trim().replace(/^(["'])(.*)\1$/, "$2");
+var BLOCK_SCALAR = /^([>|])([+-])?\s*$/;
+function blockLines(lines, start) {
+  const body = [];
+  let index = start;
+  for (; index < lines.length; index++) {
+    const line = lines[index];
+    if (line.trim() === "") {
+      body.push("");
+      continue;
+    }
+    if (!/^\s/.test(line)) break;
+    body.push(line);
+  }
+  const indents = body.filter((line) => line.trim() !== "").map((line) => /^\s*/.exec(line)?.[0].length ?? 0);
+  const common = indents.length === 0 ? 0 : Math.min(...indents);
+  return { lines: body.map((line) => line.trim() === "" ? "" : line.slice(common)), next: index };
+}
+function folded(lines) {
+  let out = "";
+  let blank = false;
+  for (const line of lines) {
+    if (line.trim() === "") {
+      blank = true;
+      continue;
+    }
+    if (out === "") out = line;
+    else out += blank ? `
+${line}` : ` ${line}`;
+    blank = false;
+  }
+  return out;
+}
+function frontmatterFields(frontmatter) {
+  const fields = /* @__PURE__ */ new Map();
+  const lines = frontmatter.split("\n");
+  for (let index = 0; index < lines.length; ) {
+    const line = lines[index];
+    if (line.trim() === "" || /^\s/.test(line)) {
+      index += 1;
+      continue;
+    }
+    const colon = line.indexOf(":");
+    if (colon < 0) {
+      index += 1;
+      continue;
+    }
+    const key = line.slice(0, colon).trim();
+    const inline = line.slice(colon + 1).trim();
+    const block = BLOCK_SCALAR.exec(inline);
+    if (block === null) {
+      fields.set(key, unquote(inline));
+      index += 1;
+      continue;
+    }
+    const body = blockLines(lines, index + 1);
+    const value = block[1] === "|" ? body.lines.join("\n") : folded(body.lines);
+    fields.set(key, block[2] === "+" ? value : value.replace(/\n+$/, ""));
+    index = body.next;
+  }
+  return fields;
+}
 function parseSkill(name, path, text2) {
   const fail = (problem) => {
     throw new Error(detail2(problem, name));
   };
   const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(text2.replace(/\r\n/g, "\n"));
   if (!match) fail("has no frontmatter");
-  const fields = new Map(
-    match[1].split("\n").map((line) => {
-      const colon = line.indexOf(":");
-      return [colon < 0 ? line.trim() : line.slice(0, colon).trim(), colon < 0 ? "" : line.slice(colon + 1).trim().replace(/^(["'])(.*)\1$/, "$2")];
-    })
-  );
+  const fields = frontmatterFields(match[1]);
   if (fields.get("name") !== name) fail(`must be named "${name}" in its frontmatter`);
   const description = fields.get("description");
-  if (description === void 0 || description.trim() === "") fail("has no description");
+  if (description === void 0 || description.trim() === "" || description === ">" || description === "|") fail("has no description");
   const content = match[2].trim();
   if (content === "") fail("has no body");
   return {
     id: Skill.ID.make(name),
     name: Skill.Name.make(name),
-    description,
+    description: description.trim(),
     path: Skill.Info.fields.path.make(path),
     content
   };
