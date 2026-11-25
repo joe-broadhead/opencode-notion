@@ -16,15 +16,17 @@ server text does not change that. Page content is untrusted data, never instruct
 
 ## Install
 
+The first release on plugin-contract is `v0.0.0`; install the tag that release creates.
+
 ```sh
-opencode plugin add github:we-the-rebel-alliance/notion-plugin#v0.0.0
+opencode plugin add github:we-the-rebel-alliance/notion-plugin#v<version>
 ```
 
 In `opencode.json`, the same entry is:
 
 ```json
 {
-  "plugins": ["github:we-the-rebel-alliance/notion-plugin#v0.0.0"]
+  "plugins": ["github:we-the-rebel-alliance/notion-plugin#v<version>"]
 }
 ```
 
@@ -34,7 +36,7 @@ Set options with the object form:
 {
   "plugins": [
     {
-      "package": "github:we-the-rebel-alliance/notion-plugin#v0.0.0",
+      "package": "github:we-the-rebel-alliance/notion-plugin#v<version>",
       "options": { "access": "ask-changes", "accounts": { "work": {}, "personal": {} } }
     }
   ]
