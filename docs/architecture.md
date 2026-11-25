@@ -17,7 +17,7 @@ The plugin owns what only it knows: the per-alias server names, the pages source
 | `src/handlers/events.ts` | `events_list`: the search walk, last-edit ordering, the plan gate, gaps, the URL filter and the cursor |
 | `src/handlers/probe.ts` | `probe`: one identity read per alias, no content |
 | `src/handlers/status.ts` | `status`: host, state, one entry per alias and one next step |
-| `src/skills.ts` | Reads and validates `skills/*/SKILL.md`; setup registers the skills directly through `ctx.skill.transform` |
+| `src/skills.ts` | Reads and checks every `skills/*/SKILL.md` as YAML; `registerSkills` adds them through `ctx.skill.transform` at setup |
 | `src/status.ts` | The `/notion` command view, which renders the same status answer |
 | `src/watch.ts` | The `account` bus watcher: an alias's MCP server status changed |
 
@@ -57,7 +57,7 @@ holds page content and never reaches disk.
 | `ctx.mcp.list` | The provider's connection state, and status's per-alias state |
 | `ctx.tool.list` and an MCP tool's `execute` | Every `notion-get-self` and `notion-search` read |
 | `ctx.agent.list` | The `/notion` view's unguarded-agent list; the status handler asks the call instead |
-| `ctx.skill.transform` | Adds the `notion` and `notion-write` skills at setup |
+| `ctx.skill.transform` | Adds the `notion` and `notion-write` skills from `registerSkills` at setup |
 | `ctx.command.transform` and `ctx.session.synthetic` | The `/notion` status view |
 | `ctx.event.subscribe` | `mcp.status.changed` for the alias servers, which emits `account` |
 | `ctx.permission.assert`, `ctx.agent.transform`, `ctx.tool.transform` and `ctx.rpc.register` | Reached only through the contract's `register`, never by the plugin |
@@ -67,10 +67,9 @@ holds page content and never reaches disk.
 1. `assertHost(ctx, manifest)` refuses an OpenCode release outside `>=2.4.1 <2.5.0` with `HOST_UNTESTED`, unless
    `options.allowUntestedHost` is true.
 2. `registerNotionAccounts` reads the user's `notion` entry, then registers `notion-<alias>` for every alias it owns.
-3. `loadSkills` reads `skills/*/SKILL.md`; the provider, the identity cache, the handler table and the status reader are built.
+3. `registerSkills(ctx)` reads every `skills/*/SKILL.md` as YAML and adds it through `ctx.skill.transform`; a bad file fails setup with `SCHEMA_VIOLATION`. The provider, the identity cache, the handler table and the status reader are built.
 4. `register(ctx, manifest, handlers)` adds the access rules, the namespace and one RPC id `notion`, and builds the
-   bus writer from that registration; `registration.bus` and every `call.bus` are always present. A direct
-   `ctx.skill.transform` call in setup adds both skills.
+   bus writer from that registration; `registration.bus` and every `call.bus` are always present.
 5. The `/notion` command is registered. Its view derives the rules with `accessLevel`/`rulesFor` from the options and
    asks `unguardedAgents` for the agents; the status handler asks `call.unguardedAgents()` instead, so it keeps no state
    filled after `register` returns.

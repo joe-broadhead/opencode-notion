@@ -9,7 +9,7 @@ import { createStatus } from "./handlers/status.ts"
 import { manifest, version } from "./manifest.ts"
 import { identities } from "./provider/identity.ts"
 import { createProvider } from "./provider/notion.ts"
-import { loadSkills } from "./skills.ts"
+import { readSkills, registerSkills } from "./skills.ts"
 import { registerStatusCommand } from "./status.ts"
 import { watchAccountStatus } from "./watch.ts"
 
@@ -22,13 +22,14 @@ export default Plugin.define({
   id: manifest.plugin.name,
   async setup(ctx) {
     assertHost(ctx, manifest)
+    // Check every skill before anything registers, so a malformed file fails setup with one clear SCHEMA_VIOLATION.
+    const skills = readSkills()
     const options = ctx.options ?? {}
     const accounts = await registerNotionAccounts(ctx, manifest, options)
-    const { skills, problems: skillProblems } = await loadSkills()
     const cache = identities()
     const owned = (alias: string) => !(alias === "default" && accounts.source?.type === "conflict")
     const provider = createProvider({ tool: ctx.tool, mcp: ctx.mcp, owned })
-    const problems = [...accounts.problems, ...(accounts.source?.type === "conflict" ? [conflictProblem(accounts.source)] : []), ...skillProblems]
+    const problems = [...accounts.problems, ...(accounts.source?.type === "conflict" ? [conflictProblem(accounts.source)] : [])]
     const status = createStatus({
       manifest,
       version,
@@ -44,9 +45,7 @@ export default Plugin.define({
       events_list: eventsHandler(provider, cache),
     }
     const registration = await register(ctx, manifest, handlers)
-    const skillsRegistration = await ctx.skill.transform((editor) => {
-      for (const info of skills) editor.add(info)
-    })
+    const skillsRegistration = await registerSkills(ctx, skills)
     const level = accessLevel(options)
     const rules = level.ok ? rulesFor(manifest, level.value, accounts.aliases) : []
     const watched = accounts.aliases.filter(owned)

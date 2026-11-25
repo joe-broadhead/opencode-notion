@@ -44,7 +44,7 @@ src/provider/server.ts   the one Notion MCP URL, the OAuth scope pin and the ser
 src/provider/notion.ts   the provider client and the notion-search answer parser
 src/provider/identity.ts the per-alias identity cache
 src/handlers/            events_list, probe and status, one file each
-src/skills.ts            reads and validates skills/*/SKILL.md; setup calls ctx.skill.transform directly
+src/skills.ts            reads and checks skills/*/SKILL.md as YAML; setup calls registerSkills, which uses ctx.skill.transform
 src/status.ts            the /notion command view
 src/watch.ts             the account bus watcher
 skills/notion/           the main skill
