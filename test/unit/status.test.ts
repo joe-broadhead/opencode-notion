@@ -1,6 +1,5 @@
 import { describe, expect, test } from "vitest"
-import type { MethodCall } from "@we-the-rebel-alliance/plugin-contract/register"
-import { createStatus, formatStatus, unguardedAgentsOf } from "../../src/handlers/status.ts"
+import { createStatus, formatStatus } from "../../src/handlers/status.ts"
 import { identities } from "../../src/provider/identity.ts"
 import { manifest } from "../../src/manifest.ts"
 import { methodCall } from "../support/call.ts"
@@ -26,7 +25,7 @@ describe("status", () => {
       { name: "notion-work", status: { status: "connected" } },
       { name: "notion-personal", status: { status: "needs_auth" } },
     ])
-    const answer = await status.read(["plan"])
+    const answer = await status.read({ ok: true, agents: ["plan"] })
     expect(answer.name).toBe("notion")
     expect(answer.version).toBe("0.0.0")
     expect(answer.host).toEqual({ version: "2.4.1", range: ">=2.4.1 <2.5.0", tested: ["2.4.1"] })
@@ -45,11 +44,11 @@ describe("status", () => {
       { name: "notion-work", status: { status: "failed", error: "the token was refused" } },
       { name: "notion-personal", status: { status: "connected" } },
     ])
-    const answer = await status.read([])
+    const answer = await status.read({ ok: true, agents: [] })
     expect(answer.accounts.find((account) => account.alias === "work")?.state).toBe("error")
     expect(answer.accounts.find((account) => account.alias === "work")?.reason).toContain("the token was refused")
     const missing = statusFor([{ name: "notion-work", status: { status: "connected" } }])
-    expect((await missing.read([])).accounts.find((account) => account.alias === "personal")?.state).toBe("needs_sign_in")
+    expect((await missing.read({ ok: true, agents: [] })).accounts.find((account) => account.alias === "personal")?.state).toBe("needs_sign_in")
   })
 
   test("a setup problem makes the state an error and becomes the next step", async () => {
@@ -63,18 +62,21 @@ describe("status", () => {
       mcp: { list: async () => ({ data: [{ name: "notion-work", status: { status: "connected" } }] }) } as never,
       identities: cache,
     })
-    const answer = await status.read([])
+    const answer = await status.read({ ok: true, agents: [] })
     expect(answer.state).toBe("error")
     expect(answer.nextStep).toContain("mcp.servers.notion")
   })
 
-  test("asks the register's call for the unguarded agents, and reports an unreadable list as a problem", async () => {
-    expect(await unguardedAgentsOf(methodCall("work", { unguardedAgents: async () => ["build"] }))).toEqual({ agents: ["build"] })
-    const frozen = methodCall("work", { unguardedAgents: (async () => ({ ok: false, error: "the host refused" })) as unknown as MethodCall["unguardedAgents"] })
-    const failed = await unguardedAgentsOf(frozen)
-    expect(failed.agents).toEqual([])
-    expect(failed.problem).toContain("UNAVAILABLE")
-    expect(failed.problem).toContain("Next step:")
+  test("passes the call's unguarded-agents result straight through, including a failure", async () => {
+    const status = statusFor([{ name: "notion-work", status: { status: "connected" } }])
+    const call = methodCall("work", { unguardedAgents: async () => ({ ok: true, agents: ["build"] }) })
+    const answer = (await status.handler.run({}, call)) as { unguardedAgents: string[] }
+    expect(answer.unguardedAgents).toEqual(["build"])
+
+    const failed = await status.read({ ok: false, error: "the host refused the agent list" })
+    expect(failed.state).toBe("error")
+    expect(failed.unguardedAgents).toEqual([])
+    expect(failed.nextStep).toContain("the host refused the agent list")
   })
 
   test("formats the command view without content", () => {

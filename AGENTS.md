@@ -31,7 +31,7 @@ goes through OpenCode's executor for the alias's MCP server.
 | `npm run check` | the full gate: lint, typecheck, build, docs drift, unit, conformance, host, pack |
 | `npx plugin-kit check` | conformance (T0 and T1), the required doc files, forbidden patterns and the bundled-kit check; it does not typecheck, build or run the unit tests |
 | `npx plugin-kit docs` | regenerates the generated doc sections from the manifest |
-| `npx plugin-kit record` | records and redacts `fixtures/conformance.json` |
+| `npx plugin-kit record` | validates and redacts `fixtures/conformance.json`; it cannot call the plugin's handlers, so `RECORD=1 npm test` writes it |
 | `npx plugin-kit release <version>` | cuts a 0.0.x release; CI publishes the GitHub release on the tag |
 
 ## Layout

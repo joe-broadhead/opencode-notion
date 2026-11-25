@@ -10,7 +10,8 @@ import {
   type StatusAnswer,
 } from "@we-the-rebel-alliance/plugin-contract/accounts"
 import type { JsonSchema, Manifest, Owner } from "@we-the-rebel-alliance/plugin-contract/manifest"
-import type { MethodCall, MethodHandler } from "@we-the-rebel-alliance/plugin-contract/register"
+import type { MethodHandler } from "@we-the-rebel-alliance/plugin-contract/register"
+import type { UnguardedAgentsResult } from "@we-the-rebel-alliance/plugin-contract/access"
 import { accountName } from "@we-the-rebel-alliance/plugin-contract/accounts"
 import type { Identities } from "../provider/identity.ts"
 import type { Identity } from "../provider/notion.ts"
@@ -29,26 +30,6 @@ function ownerOf(identity: Identity): Owner {
 const problemLine = (value: string): string => {
   const text = redactReason(value)
   return text.length <= MAX_PROBLEM ? text : `${text.slice(0, MAX_PROBLEM - 1)}…`
-}
-
-/**
- * The agents that lack the generated rules, as the call reports them. The handler never reads `ctx.agent.list()` or a
- * registration field; the register answers from its own registration. This is the one place a freeze that changes the
- * answer's shape touches.
- */
-export async function unguardedAgentsOf(call: MethodCall): Promise<{ agents: readonly string[]; problem?: string }> {
-  try {
-    const answer = (await call.unguardedAgents()) as unknown as
-      | readonly string[]
-      | { readonly ok: true; readonly agents: readonly string[] }
-      | { readonly ok: false; readonly error: string }
-    if (Array.isArray(answer)) return { agents: answer }
-    if ("ok" in answer && answer.ok) return { agents: answer.agents }
-    return { agents: [], problem: problemLine(`UNAVAILABLE: the agent list could not be read (${"ok" in answer ? answer.error : "no answer"}). Next step: restart OpenCode and run /notion status again.`) }
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error)
-    return { agents: [], problem: problemLine(`UNAVAILABLE: the agent list could not be read (${reason}). Next step: restart OpenCode and run /notion status again.`) }
-  }
 }
 
 /** What status is built from: values setup already has, plus the host's current MCP server states. */
@@ -92,7 +73,7 @@ async function signalsOf(deps: StatusDeps): Promise<Readonly<Record<string, Acco
 /** What the status handler and the `/notion` view share. `read` never keeps state: it asks the host when it runs. */
 export interface StatusReader {
   readonly handler: MethodHandler
-  read(unguardedAgents: readonly string[], extraProblems?: readonly string[]): Promise<StatusAnswer>
+  read(unguardedAgents: UnguardedAgentsResult): Promise<StatusAnswer>
 }
 
 /**
@@ -102,8 +83,8 @@ export interface StatusReader {
  */
 export function createStatus(deps: StatusDeps): StatusReader {
   const profiles: readonly AccountProfile[] = deps.aliases.map((alias) => ({ alias }))
-  const read = async (unguardedAgents: readonly string[], extraProblems: readonly string[] = []): Promise<StatusAnswer> => {
-    const problems = [...deps.problems, ...extraProblems]
+  const read = async (unguardedAgents: UnguardedAgentsResult): Promise<StatusAnswer> => {
+    const problems = [...deps.problems]
     let accounts: readonly AccountStatus[]
     try {
       accounts = accountStatuses(profiles, await signalsOf(deps))
@@ -127,8 +108,7 @@ export function createStatus(deps: StatusDeps): StatusReader {
       input: EMPTY,
       output: STATUS_SCHEMA,
       async run(_input, call) {
-        const { agents, problem } = await unguardedAgentsOf(call)
-        return read(agents, problem === undefined ? [] : [problem])
+        return read(await call.unguardedAgents())
       },
     },
     read,

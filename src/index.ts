@@ -1,5 +1,6 @@
 import { Plugin } from "@opencode/plugin"
 import { unguardedAgents } from "@we-the-rebel-alliance/plugin-contract/access"
+import { redactReason } from "@we-the-rebel-alliance/plugin-contract/accounts"
 import { assertHost, register } from "@we-the-rebel-alliance/plugin-contract/register"
 import { registerNotionAccounts, type ServerSource } from "./accounts.ts"
 import { eventsHandler } from "./handlers/events.ts"
@@ -43,8 +44,13 @@ export default Plugin.define({
     const watched = accounts.aliases.filter(owned)
     const stopWatch = watchAccountStatus(ctx, watched, (event, data) => registration.bus.emit(event, data), (alias) => cache.clear(alias))
     const command = await registerStatusCommand(ctx, async () => {
-      const agents = unguardedAgents((await ctx.agent.list()).data, registration.access.rules)
-      return status.read(agents)
+      try {
+        const agents = unguardedAgents((await ctx.agent.list()).data, registration.access.rules)
+        return status.read({ ok: true, agents })
+      } catch (error) {
+        const reason = redactReason(error instanceof Error ? error.message : String(error))
+        return status.read({ ok: false, error: `UNAVAILABLE: the agent list could not be read (${reason}). Next step: restart OpenCode and run /notion status again.` })
+      }
     })
     return async () => {
       await stopWatch()

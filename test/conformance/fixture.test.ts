@@ -49,7 +49,7 @@ async function recorded() {
   const unknown = resolveAccount(plan.value.accounts, { account: "nobodyhere" })
   if (required.ok || unknown.ok) throw new Error("two aliases must refuse a missing and an unknown account")
 
-  const statusAnswer = await status.read([], [])
+  const statusAnswer = await status.read({ ok: true, agents: [] })
 
   const emitted: string[] = []
   let first: () => void = () => {}
