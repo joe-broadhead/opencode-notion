@@ -80,7 +80,7 @@ async function recorded() {
       "Recorded from the plugin's own handlers over a fake OpenCode MCP boundary: two synthetic aliases, invented workspaces, pages and people, and no secret. RECORD=1 writes it.",
     plugin: PACKAGE,
     accounts: {
-      real: true,
+      real: false,
       aliases: [...aliases],
       required: { method: "events_list", code: "ACCOUNT_REQUIRED" },
       unknown: { method: "events_list", account: "nobodyhere", code: "ACCOUNT_UNKNOWN" },

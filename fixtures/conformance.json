@@ -2,7 +2,7 @@
   "$comment": "Recorded from the plugin's own handlers over a fake OpenCode MCP boundary: two synthetic aliases, invented workspaces, pages and people, and no secret. RECORD=1 writes it.",
   "plugin": "@we-the-rebel-alliance/notion-plugin",
   "accounts": {
-    "real": true,
+    "real": false,
     "aliases": [
       "work",
       "personal"

@@ -42,5 +42,6 @@ and `personal`; it holds no real account, page or secret. `RECORD=1 npm test` wr
 
 ## Releases
 
-The lead cuts releases after merge with `npx plugin-kit release 0.0.0`; CI publishes the GitHub release on the tag. Do
-not tag or publish by hand.
+The lead cuts releases after merge with `npx plugin-kit release 0.0.0`; CI publishes the GitHub release on the tag. The
+workflow attaches the package tarball (`*.tgz`, which contains the committed `dist/`), `conformance.json` and
+`SHA256SUMS` with their pinned hashes. Do not tag or publish by hand.
