@@ -1,5 +1,5 @@
 import { Plugin } from "@opencode/plugin"
-import { unguardedAgents } from "@we-the-rebel-alliance/plugin-contract/access"
+import { accessLevel, rulesFor, unguardedAgents } from "@we-the-rebel-alliance/plugin-contract/access"
 import { redactReason } from "@we-the-rebel-alliance/plugin-contract/accounts"
 import { assertHost, register } from "@we-the-rebel-alliance/plugin-contract/register"
 import { registerNotionAccounts, type ServerSource } from "./accounts.ts"
@@ -21,7 +21,8 @@ export default Plugin.define({
   id: manifest.plugin.name,
   async setup(ctx) {
     assertHost(ctx, manifest)
-    const accounts = await registerNotionAccounts(ctx, manifest, ctx.options ?? {})
+    const options = ctx.options ?? {}
+    const accounts = await registerNotionAccounts(ctx, manifest, options)
     const cache = identities()
     const owned = (alias: string) => !(alias === "default" && accounts.source?.type === "conflict")
     const provider = createProvider({ tool: ctx.tool, mcp: ctx.mcp, owned })
@@ -41,11 +42,13 @@ export default Plugin.define({
       events_list: eventsHandler(provider, cache),
     }
     const registration = await register(ctx, manifest, handlers)
+    const level = accessLevel(options)
+    const rules = level.ok ? rulesFor(manifest, level.value, accounts.aliases) : []
     const watched = accounts.aliases.filter(owned)
     const stopWatch = watchAccountStatus(ctx, watched, (event, data) => registration.bus.emit(event, data), (alias) => cache.clear(alias))
     const command = await registerStatusCommand(ctx, async () => {
       try {
-        const agents = unguardedAgents((await ctx.agent.list()).data, registration.access.rules)
+        const agents = unguardedAgents((await ctx.agent.list()).data, rules)
         return status.read({ ok: true, agents })
       } catch (error) {
         const reason = redactReason(error instanceof Error ? error.message : String(error))

@@ -68,6 +68,7 @@ holds page content and never reaches disk.
 3. The provider, the identity cache, the handler table and the status reader are built.
 4. `register(ctx, manifest, handlers)` adds the access rules, the namespace and one RPC id `notion`, and builds the
    bus writer from that registration; `registration.bus` and every `call.bus` are always present.
-5. The `/notion` command is registered. Its view reads `ctx.agent.list()` and the registration's rules; the status
-   handler asks `call.unguardedAgents()` instead, so it keeps no state filled after `register` returns.
+5. The `/notion` command is registered. Its view derives the rules with `accessLevel`/`rulesFor` from the options and
+   asks `unguardedAgents` for the agents; the status handler asks `call.unguardedAgents()` instead, so it keeps no state
+   filled after `register` returns.
 6. The account watcher subscribes last. Setup returns one cleanup that stops it and disposes the registration.
