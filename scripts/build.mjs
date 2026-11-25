@@ -1,7 +1,7 @@
 // One self-contained server bundle: `src/index.ts` -> `dist/index.js`.
 //
 // Only the host module and Node built-ins stay external; the contract library is inlined. A bare import that is
-// neither the host's nor the contract's fails the build, so the published bundle imports nothing else.
+// neither the host's nor the contract's fails the bundle, so the published entry imports nothing else.
 import { rm } from "node:fs/promises"
 import { build } from "esbuild"
 
@@ -32,3 +32,4 @@ await build({
     },
   ],
 })
+console.log("bundle: dist/index.js")

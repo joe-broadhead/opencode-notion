@@ -28,8 +28,8 @@ goes through OpenCode's executor for the alias's MCP server.
 | Command | Does |
 |---|---|
 | `npm ci` | installs dev tooling only; there are no runtime dependencies |
-| `npm run check` | the full gate: lint, typecheck, build, docs drift, unit, conformance, host, pack |
-| `npx plugin-kit check` | conformance (T0 and T1), the required doc files, forbidden patterns and the bundled-kit check; it does not typecheck, build or run the unit tests |
+| `npm run check` | the full gate: lint, typecheck, bundle and `dist/` drift, docs drift, unit, conformance, host, pack |
+| `npx plugin-kit check` | conformance (T0 and T1), the required doc files, forbidden patterns and the bundled-kit check; it does not typecheck, bundle or run the unit tests |
 | `npx plugin-kit docs` | regenerates the generated doc sections from the manifest |
 | `npx plugin-kit record` | validates and redacts `fixtures/conformance.json`; it cannot call the plugin's handlers, so `RECORD=1 npm test` writes it |
 | `npx plugin-kit release <version>` | cuts a 0.0.x release; CI publishes the GitHub release on the tag |
@@ -105,7 +105,7 @@ and `automations`. Hand-written text is plain English: short sentences, one term
 
 ## Forbidden
 
-- Editing `dist/` by hand, or committing it outside a release.
+- `dist/` is committed and regenerated with `npm run bundle`; never edit it by hand.
 - Adding runtime dependencies, peer dependencies or lifecycle scripts.
 - Naming any app in code, manifest or docs, except in an `x-<app>` key.
 - Copying contract code into this repository.

@@ -30,4 +30,6 @@ jobs:
         # The contract is a public repository, and npm records its GitHub dependency over ssh. A runner has no key.
         run: git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
       - run: npm ci --ignore-scripts
+      - name: Dist is current
+        run: npm run bundle && git diff --exit-code dist/
       - run: npm run check

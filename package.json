@@ -476,13 +476,13 @@
     }
   },
   "scripts": {
-    "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "biome lint .",
     "test": "vitest run test/unit test/conformance test/host",
     "test:pack": "vitest run test/pack",
     "docs": "npx plugin-kit docs",
-    "check": "npm run lint && npm run typecheck && npm run build && npx plugin-kit docs --check && npm run test && npx plugin-kit check && npm run test:pack"
+    "check": "npm run lint && npm run typecheck && npm run bundle && git diff --exit-code dist/ && npx plugin-kit docs --check && npm run test && npx plugin-kit check && npm run test:pack",
+    "bundle": "node scripts/build.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.9",

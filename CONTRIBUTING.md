@@ -12,17 +12,17 @@ npm ci --ignore-scripts
 npm run check
 ```
 
-`npm run check` runs, in order: `biome lint`, `tsc`, the build, `plugin-kit docs --check`, the unit, conformance and
+`npm run check` runs, in order: `biome lint`, `tsc`, the bundle and a `git diff --exit-code dist/`, `plugin-kit docs --check`, the unit, conformance and
 host suites, `plugin-kit check` (T0/T1, the doc file set, forbidden patterns and the bundled-kit check) and the pack
 suite. It stops at the first failure. Run one repository's full check at a time: the host and pack suites bind fixed
 ports.
 
-Shortcuts: `npm run typecheck`, `npm run build`, `npm test`, `npm run test:pack`, `npm run lint`, `npm run docs`.
+Shortcuts: `npm run typecheck`, `npm run bundle`, `npm test`, `npm run test:pack`, `npm run lint`, `npm run docs`.
 
 ## Try it in OpenCode
 
 ```sh
-npm run build
+npm run bundle
 ```
 
 Then list the folder in `plugins`, as an absolute path or a path relative to the config file, and restart OpenCode:
