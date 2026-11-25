@@ -91,6 +91,28 @@ describe("events_list", () => {
     expect(page.events).toEqual([])
   })
 
+  test("resumes after the (timestamp, page id) pair, so two edits at one time split without a skip or duplicate", async () => {
+    const tie = "2026-11-18T10:15:00.000Z"
+    const pages = [
+      { id: "p-tie-a", type: "page" as const, title: "Tie A", edited_at: tie, edited_by: "u-ana", created_by: "u-ana" },
+      { id: "p-tie-b", type: "page" as const, title: "Tie B", edited_at: tie, edited_by: "u-ana", created_by: "u-ana" },
+    ]
+    const { handler } = eventsFor({ work: { ...WORKSPACES.work, pages } })
+
+    const first = (await handler.run({ source: "pages", since: "2026-11-15", limit: 1 }, methodCall("work"))) as { events: { external_id: string }[]; cursor: string; more: boolean }
+    expect(first.events.map((event) => event.external_id)).toEqual([`p-tie-a@${tie}`])
+    expect(first.more).toBe(true)
+    if (first.events[0] === undefined) throw new Error("the first page must list one event")
+
+    const second = (await handler.run({ source: "pages", cursor: first.cursor, limit: 1 }, methodCall("work"))) as { events: { external_id: string }[]; cursor: string; more: boolean }
+    expect(second.events.map((event) => event.external_id)).toEqual([`p-tie-b@${tie}`])
+    expect(second.more).toBe(false)
+    if (second.events[0] === undefined) throw new Error("the second page must list one event")
+
+    const third = (await handler.run({ source: "pages", cursor: second.cursor, limit: 1 }, methodCall("work"))) as { events: unknown[] }
+    expect(third.events).toEqual([])
+  })
+
   test("answers a hole as one gap on the page that passes it, and lists the edits after it", async () => {
     const above = Date.parse("2026-01-10T12:00:00.000Z")
     const older: Edited = { id: "p-old", t: Date.parse("2026-01-09T12:00:00.000Z"), type: "page", title: "Old", url: null }
