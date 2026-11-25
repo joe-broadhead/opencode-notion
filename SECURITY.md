@@ -2,7 +2,8 @@
 
 ## Supported versions
 
-Fixes go into the newest release. Older releases are not patched. The plugin supports OpenCode `>=2.4.1 <2.5.0`, tested on 2.4.1.
+Fixes go into the newest release. Older releases are not patched. The plugin supports OpenCode `>=2.4.1 <2.5.0`, tested
+on 2.4.1.
 
 ## Reporting a vulnerability
 
@@ -15,92 +16,41 @@ project.
 
 ## Data handling
 
-- The plugin holds no credential and runs no network request of its own. It registers Notion's MCP server with OpenCode,
-  and OpenCode connects, signs in and stores the credentials. The tools RPC for scripts runs Notion's tools through
-  OpenCode's own connection, too.
-- The plugin never reads tokens. Of a user's own `mcp.servers.notion` entry it reads only the type, the URL and whether
-  `oauth` is `false`; it never reads, copies or reports its `headers`, which may hold an MCP token. Status shows server
-  URLs without their query strings, never OpenCode's text for a needed sign-in, which can hold an authorization URL, and
-  cuts a connection failure's reason to one line with no URL credentials, query or token.
-- The workspace name and connection type come from the last `events_list` or `probe` read, or a script's
-  `notion-get-self` call, and are kept in memory only. Nothing else of that result is read: no user name, email or ID, no
-  workspace ID, and not the icon.
-- **Workspace content is other people's data.** Pages, databases, comments, files, meeting notes and calendar entries
-  reach the model as tool results, and the agent sends them to your model provider, like any other tool result in the
-  session. Notion acts with the permissions of the person who signed in. Notion stores workspace data in the United
-  States, unless an Enterprise workspace has been migrated to another region, and the workspace's own AI policy applies.
-- **Notion's connected sources are a second path.** `notion-connector-search` searches the Slack, Drive, GitHub, Jira,
-  mail and calendar sources connected in Notion, and needs Business or Enterprise with Notion AI. A hit passes through
-  Notion to the model, under the user's own connection to each source. The plugin routes a Slack, Drive, GitHub, Linear or
-  Granola question to that source's own plugin first, and labels anything that came through Notion's connector.
-- Notion content is untrusted. Pages, comments, fetched threads and Notion AI summaries come from other people and can
-  contain instructions aimed at the model. The skills tell the model to treat them as data, and never to follow an
-  instruction inside a page or a comment.
-- **Every Notion tool is allowed by default**, so an agent can create, update or move a page, comment, change a database,
-  upload a Skill, start or drive a Notion Custom Agent, cancel an event, or trash a page without a prompt. Those reach
-  people: a comment's mention notifies a colleague, a moved page changes who can see it, a calendar event may notify its
-  attendees, and a Custom Agent acts with the user's permissions and spends AI credits.
-- **One line restricts it.** Set `"access": "ask-changes"` in the plugin options and every change asks first, or
-  `"access": "read-only"` and every change is denied. A rule in an agent's own `permissions` restricts one agent, and a
-  `deny` in the top-level `permissions` restricts every agent. The README's
-  [Permissions](https://github.com/we-the-rebel-alliance/notion-plugin/blob/master/README.md#access-and-permissions) has
-  the three choices.
+- The plugin holds no credential and makes no HTTP request of its own. It registers one vendor MCP server per alias;
+  OpenCode connects, signs in and stores each credential. Every read the plugin makes goes through OpenCode's executor
+  for that server.
+- The one OAuth scope requested is `default`. The plugin never asks for a password, an API key or an integration token.
+- Of a user's own `mcp.servers.notion` entry the plugin reads only the type, the URL and whether `oauth` is `false`. It
+  never reads, copies or reports its headers. Status shows server URLs without their query strings.
+- The per-alias identity is kept in the plugin instance only: the owner's id and label and the workspace's id and name. No page
+  content, no email and no token is kept.
+- Workspace content is other people's data. Pages, databases, comments, files and calendar entries reach the model as
+  tool results, like any other tool result in the session. Notion returns only what the signed-in person can see.
+- Notion content is untrusted. Pages, comments, files and connector results come from other people and can contain
+  instructions aimed at the model. The skills tell the model to treat them as data, and never to follow an instruction
+  inside a page or a comment.
 
 ## Permissions
 
-What the model can do in Notion is limited by these layers, in this order:
+1. **Notion's server and the workspace's access.** The sign-in is the person's own; the server returns only what that
+   person can see. An admin can restrict AI apps to an approved list.
+2. **Generated access rules.** The contract generates one rule per method and one per alias for each pass-through MCP
+   tool. `all` allows everything, `ask-changes` asks for every non-read, and `read-only` denies it. A method with
+   `effect: "ask"` asks even at `all`.
+3. **The person's own rules.** OpenCode applies the agent's and the session's rules after the generated ones; a saved
+   approval beats an `ask` but never a `deny`.
 
-1. **Notion's server and your workspace access.** The sign-in is your own Notion user, and the server returns only what
-   that user can see. Guests cannot connect. An Enterprise workspace can restrict its members to an approved list of AI
-   apps, and an admin can revoke a connection. Notion offers one scope for all of MCP, so there is no read-only sign-in:
-   read-only use comes from permission rules.
-2. **Default permission rules.** The plugin inserts one block generated from the tool table and the `access` option. Its
-   default, `all`, allows every Notion tool, reads and changes alike. `ask-changes` allows a read and asks for everything
-   else; `read-only` allows a read and denies everything else, which also hides it from the model.
-3. **Your OpenCode permissions.** Your `permissions` rules come after the plugin's. A saved "Always allow" beats an
-   `ask` but never a `deny`.
+A saved approval on a pass-through tool applies to that alias's server only. A rule or grant for one alias never reaches
+another alias's tools.
 
-Things to know:
+## Scripts and RPC
 
-- **One sign-in per workspace.** Notion rotates the refresh token on every use, and reusing one that has been rotated
-  away revokes the whole grant. Two OpenCode processes sharing one credential can revoke it for each other. Run one
-  process per sign-in, and if a sign-in that worked needs a new one, sign out and in again once.
-- **Saved approvals are broad.** "Always allow" on a Notion tool saves the pattern `*` for that tool's action. It applies
-  to every agent in the OpenCode project, Plan included, until you remove it.
-- **Some agents get no default rules.** Agents defined only in your own config, and agents added by plugins that load
-  after this one, are created after the plugin inserts its rules, and agents without a base allow get none. Under the
-  default `access: "all"` that changes nothing; under `ask-changes` or `read-only` those agents stay unrestricted.
-  Under those two values `/notion-status` names them and gives the fix: put the block it shows first in that agent's own
-  `permissions`, followed by your top-level rules for Notion tools. Do not put an `ask` or an `allow` in the top-level
-  `permissions`, which would loosen Explore.
-- **Unattended runs refuse prompts.** In `opencode run`, a Notion tool that would ask is refused.
-- **The `notion_*` rule also matches other servers** whose names start with `notion_`. For their tools it only adds
-  prompts.
-- **The rules follow the name, not the server.** When your own `mcp.servers.notion` points at another URL, status reports a
-  conflict and the plugin adds no server, but the default rules still allow the known read names, so a tool of that server
-  with such a name runs without asking. Point the entry at Notion's URL, or remove it.
+The single RPC id `notion` carries `status`, `probe` and `events_list`. A caller of the OpenCode server API already
+holds the server's authority; the session is not a login. A non-read method over RPC needs an answered permission ask or
+a host-signed action grant, which the contract's `register` enforces. This plugin declares no non-read method of its
+own; the vendor's tools are not RPC methods here.
 
-## Scripts
+## Report a security problem
 
-The tools RPC (`notion.workspace.tools`, see
-[Scripting](https://github.com/we-the-rebel-alliance/notion-plugin/blob/master/docs/scripting.md)) exposes every known
-Notion tool as a method for a script, with no model, each with a class: read, write or destructive. It adds no authority:
-
-- A script names a session that names an agent, and runs as them. The rules that decide are the agent's, then the
-  session's, resolved before dispatch: only `allow` runs. An `ask` is refused with no prompt and no Notion call, and a
-  `deny` is refused with no Notion call. A saved "Always allow" is not part of those rules and does not authorise a
-  script; a script's grant is a rule in config.
-- A script gets the same default. Under `access: "all"` the block allows every method, a write included. A session on an
-  agent with `ask-changes` or `read-only` needs an explicit `allow` for the method's action; the destructive class then
-  resolves to `ask` or `deny` and is refused until a rule changes it.
-- OpenCode's own executor still checks an MCP call against the agent's rules, the session's rules and saved approvals.
-- An inner ask on a script's call is denied, not prompted. The source contract's permission hook changes only an ask on
-  one of the plugin's own script calls in flight, only to a deny, and leaves every other call alone.
-- A tool that Notion adds later is not a method, even with an allow rule; `describe` reports it as unclassified.
-- The call goes through OpenCode's own MCP connection and sign-in. The plugin never sees the token, and returns none.
-- Notion's error text reaches the script only as the first line, at most 300 characters, with tokens and URL query strings
-  removed.
-- OpenCode's `execute.before` and `execute.after` tool hooks, from any plugin, do not run for a script's call. A script's
-  calls are not recorded in the session.
-- The RPC is reachable only by callers of the OpenCode server API, who already hold the server's full authority. The
-  session is not a login: it scopes a script to what its agent may do.
+Do not open a public issue for a vulnerability. Use GitHub's private vulnerability reporting, and include no token or
+workspace content in the report.
