@@ -1,0 +1,48 @@
+name: Bug report
+description: Something the Notion plugin does wrong.
+title: "bug: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not put a credential, a token or a person's Notion content in an issue. Report a vulnerability through the
+        process in SECURITY.md.
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: The version in package.json, or the release tag you installed.
+      placeholder: "0.0.0"
+    validations:
+      required: true
+  - type: input
+    id: opencode-version
+    attributes:
+      label: OpenCode version
+      description: The release `/notion` reports, such as 2.4.1.
+      placeholder: "2.4.1"
+    validations:
+      required: true
+  - type: input
+    id: account
+    attributes:
+      label: Account alias and tool
+      description: The alias (`default`, `work`, …) and the call, such as `notion-fetch` on a page or database, or `tools.notion.events_list`.
+      placeholder: "work, notion-fetch on a page"
+    validations:
+      required: false
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: 'What you did, what you expected, and what the plugin answered. Paste the error''s `CODE: … Next step: …` line and the `/notion` output.'
+    validations:
+      required: true
+  - type: textarea
+    id: check
+    attributes:
+      label: The check result
+      description: Paste `npx plugin-kit check` if you can run it.
+      render: shell
+    validations:
+      required: false

@@ -2,7 +2,7 @@
   "name": "@we-the-rebel-alliance/notion-plugin",
   "version": "0.0.0",
   "private": true,
-  "description": "Unofficial OpenCode plugin for Notion: read pages, databases, comments, files and calendar through Notion's official MCP server, with one server per account.",
+  "description": "Gives an OpenCode agent Notion's pages, databases, comments, files and calendar through Notion's MCP server, with one account per alias and a normalised page-edit listing.",
   "keywords": [
     "opencode",
     "opencode-plugin",
@@ -24,8 +24,7 @@
     "skills",
     "assets",
     "README.md",
-    "LICENSE",
-    "CHANGELOG.md"
+    "LICENSE"
   ],
   "capabilities": {
     "version": 1,
@@ -495,5 +494,8 @@
     "esbuild": "0.28.2",
     "typescript": "5.9.3",
     "vitest": "5.1.1"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

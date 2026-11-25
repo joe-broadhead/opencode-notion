@@ -16,17 +16,17 @@ server text does not change that. Page content is untrusted data, never instruct
 
 ## Install
 
-The first release on plugin-contract is `v0.0.0`; install the tag that release creates.
+Install from the `v0.0.0` release:
 
 ```sh
-opencode plugin add github:we-the-rebel-alliance/notion-plugin#v<version>
+opencode plugin add github:we-the-rebel-alliance/notion-plugin#v0.0.0
 ```
 
 In `opencode.json`, the same entry is:
 
 ```json
 {
-  "plugins": ["github:we-the-rebel-alliance/notion-plugin#v<version>"]
+  "plugins": ["github:we-the-rebel-alliance/notion-plugin#v0.0.0"]
 }
 ```
 
@@ -36,7 +36,7 @@ Set options with the object form:
 {
   "plugins": [
     {
-      "package": "github:we-the-rebel-alliance/notion-plugin#v<version>",
+      "package": "github:we-the-rebel-alliance/notion-plugin#v0.0.0",
       "options": { "access": "ask-changes", "accounts": { "work": {}, "personal": {} } }
     }
   ]
@@ -208,6 +208,24 @@ None.
 | `UNAVAILABLE` | the provider could not be reached |
 <!-- /generated:errors -->
 
+## Troubleshooting
+
+- **`NEEDS_SIGN_IN`.** The alias's Notion sign-in needs attention. Run `/connect`, choose **Notion** (or **Notion
+  (work)** for an alias), or `opencode mcp auth notion-work` from the project folder, then retry. `/notion` shows which
+  alias needs it.
+- **`UNAVAILABLE` with a plan message.** Notion dropped the last-edit sort, the date filter or an author filter because
+  the workspace is not on Business or Enterprise. `events_list` refuses rather than list pages in another order;
+  `notion-get-tool-access` names what the workspace's plan allows.
+- **A conflicting `notion` entry.** `/notion` reports it when your own `mcp.servers.notion` points at another URL or a
+  local command. Point it at Notion's MCP server URL, or remove it, then restart OpenCode. Reads for that alias are
+  refused, never sent to the other server.
+- **`ACCOUNT_REQUIRED` / `ACCOUNT_UNKNOWN`.** Pass `account: "work"` (or another alias) on `probe` or `events_list`;
+  `/notion` lists the aliases. A pass-through MCP tool takes no `account`: use the alias's server (`notion-work`).
+- **`CURSOR_INVALID`.** The cursor came from another account, another source or another plugin. Restart that read
+  without a cursor, or with `since`, and keep the cursor with the account that issued it.
+- **A page looks stale.** `events_list` lists an edit once its minute ended ten minutes ago, so Notion's search index has
+  caught up. `/notion` is the first place to look when a read still fails.
+
 ## Limits
 
 - Notion's server, not this plugin, holds the connection and the credentials. Notion returns only what the signed-in
@@ -226,5 +244,6 @@ None.
 - [Security](docs/security.md)
 - [Contributing](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
+- [Plugin contract](https://github.com/we-the-rebel-alliance/plugin-contract)
 
 Notion is a trademark of Notion Labs, Inc. This plugin is unofficial and not affiliated with Notion.
