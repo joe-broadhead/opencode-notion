@@ -1,5 +1,5 @@
 import type { Plugin } from "@opencode/plugin"
-import { accountName } from "@we-the-rebel-alliance/plugin-contract/accounts"
+import { accountName, redactReason } from "@we-the-rebel-alliance/plugin-contract/accounts"
 import { toolAction } from "@we-the-rebel-alliance/plugin-contract/access"
 import type { Owner } from "@we-the-rebel-alliance/plugin-contract/manifest"
 
@@ -38,6 +38,8 @@ export interface Edited {
 export interface Searched {
   readonly items: readonly Edited[]
   readonly count: number
+  /** Results that could not be placed in time; a page answers a gap when any were dropped. */
+  readonly malformed?: number
 }
 
 /** What `notion-search` is asked for: an empty query, the last-edit sort, a whole-day range and one author filter. */
@@ -155,7 +157,7 @@ function readFailed(tool: string, reason: string): ProviderError {
   if (limited) {
     return failure("RATE_LIMITED", `Notion's ${tool} answered rate_limited`, "Wait, then call it again with the same input; make fewer calls at once.", Number.isSafeInteger(seconds) && seconds > 0 ? seconds : undefined)
   }
-  return failure("UNAVAILABLE", `Notion's ${tool} failed: ${cut(oneLine(reason), 200)}`, "Call the method again; if it keeps failing, run /notion status.")
+  return failure("UNAVAILABLE", `Notion's ${tool} failed: ${cut(redactReason(reason), 200)}`, "Call the method again; if it keeps failing, run /notion status.")
 }
 
 /** The server's state when a Notion tool is not listed, as the contract's code and a next step. */
@@ -217,18 +219,28 @@ export function readSearch(answer: unknown): Searched {
   if (answer["type"] !== undefined && answer["type"] !== "workspace_search") throw unreadable(`answered a ${String(answer["type"]).slice(0, 40)} search, not a workspace search`)
   if (!Array.isArray(answer["results"])) throw unreadable("answered no results list")
   const items: Edited[] = []
+  let malformed = 0
   for (const result of answer["results"]) {
-    if (!record(result)) continue
+    if (!record(result)) {
+      malformed += 1
+      continue
+    }
     const { id, timestamp, type, title } = result
-    if (typeof id !== "string" || !ID.test(id) || typeof timestamp !== "string" || !ISO_WITH_ZONE.test(timestamp)) continue
+    if (typeof id !== "string" || !ID.test(id) || typeof timestamp !== "string" || !ISO_WITH_ZONE.test(timestamp)) {
+      malformed += 1
+      continue
+    }
     const t = Date.parse(timestamp)
-    if (Number.isNaN(t) || (type !== "page" && type !== "database")) continue
+    if (Number.isNaN(t) || (type !== "page" && type !== "database")) {
+      malformed += 1
+      continue
+    }
     items.push({ id: id.toLowerCase(), t, type, title: typeof title === "string" ? title : "", url: notionUrl(result["url"]) })
   }
   for (let index = 1; index < items.length; index++) {
     if (items[index]!.t > items[index - 1]!.t) throw unreadable("did not list its results by last edit, newest first")
   }
-  return { items, count: answer["results"].length }
+  return { items, count: answer["results"].length, malformed }
 }
 
 /** A Tool.Error from OpenCode's executor with no cause: Notion's own failure, not a permission refusal. */

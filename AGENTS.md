@@ -27,7 +27,7 @@ goes through OpenCode's executor for the alias's MCP server.
 
 | Command | Does |
 |---|---|
-| `npm ci` | installs dev tooling only; there are no runtime dependencies |
+| `npm ci` | installs dev tooling only; there are no runtime dependencies. The lockfile records the contract as `git+ssh`, so run `git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"` first |
 | `npm run check` | the full gate: lint, typecheck, bundle and `dist/` drift, docs drift, unit, conformance, host, pack |
 | `npx plugin-kit check` | conformance (T0 and T1), the required doc files, forbidden patterns and the bundled-kit check; it does not typecheck, bundle or run the unit tests |
 | `npx plugin-kit docs` | regenerates the generated doc sections from the manifest |
@@ -44,7 +44,7 @@ src/provider/server.ts   the one Notion MCP URL, the OAuth scope pin and the ser
 src/provider/notion.ts   the provider client and the notion-search answer parser
 src/provider/identity.ts the per-alias identity cache
 src/handlers/            events_list, probe and status, one file each
-src/skills.ts            reads skills/*/SKILL.md and registers them through ctx.skill
+src/skills.ts            reads and validates skills/*/SKILL.md; setup calls ctx.skill.transform directly
 src/status.ts            the /notion command view
 src/watch.ts             the account bus watcher
 skills/notion/           the main skill

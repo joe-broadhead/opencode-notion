@@ -9,7 +9,7 @@ import { createStatus } from "./handlers/status.ts"
 import { manifest, version } from "./manifest.ts"
 import { identities } from "./provider/identity.ts"
 import { createProvider } from "./provider/notion.ts"
-import { loadSkills, registerSkills } from "./skills.ts"
+import { loadSkills } from "./skills.ts"
 import { registerStatusCommand } from "./status.ts"
 import { watchAccountStatus } from "./watch.ts"
 
@@ -44,7 +44,9 @@ export default Plugin.define({
       events_list: eventsHandler(provider, cache),
     }
     const registration = await register(ctx, manifest, handlers)
-    const skillsRegistration = await registerSkills(ctx.skill, skills)
+    const skillsRegistration = await ctx.skill.transform((editor) => {
+      for (const info of skills) editor.add(info)
+    })
     const level = accessLevel(options)
     const rules = level.ok ? rulesFor(manifest, level.value, accounts.aliases) : []
     const watched = accounts.aliases.filter(owned)

@@ -7,7 +7,10 @@ Read [AGENTS.md](AGENTS.md) first: it lists the repository rules and the layout.
 
 Node.js 24 is required; the real host test uses `@opencode/sdk` 2.4.1, which needs it.
 
+The lockfile records the contract dependency as `git+ssh`, and a runner or a fresh checkout has no key. Rewrite it to HTTPS first:
+
 ```sh
+git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
 npm ci --ignore-scripts
 npm run check
 ```

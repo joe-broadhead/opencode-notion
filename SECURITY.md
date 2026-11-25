@@ -37,8 +37,9 @@ project.
 2. **Generated access rules.** The contract generates one rule per method and one per alias for each pass-through MCP
    tool. `all` allows everything, `ask-changes` asks for every non-read, and `read-only` denies it. A method with
    `effect: "ask"` asks even at `all`.
-3. **The person's own rules.** OpenCode applies the agent's and the session's rules after the generated ones; a saved
-   approval beats an `ask` but never a `deny`.
+3. **The person's own rules.** OpenCode applies the agent's and the session's rules after the generated ones, so a later
+   rule the person adds wins for one method. A saved approval never confirms an RPC write: the contract's register
+   forces a fresh one-call ask. No saved approval or later rule can override a `deny`.
 
 A saved approval on a pass-through tool applies to that alias's server only. A rule or grant for one alias never reaches
 another alias's tools.

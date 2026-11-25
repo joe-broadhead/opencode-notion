@@ -12152,13 +12152,17 @@ async function registerNotionAccounts(ctx, manifest2, options) {
   const expected = displayUrl(NOTION_MCP_URL);
   const problems = [];
   let existing;
+  let readFailed2 = false;
   try {
     await ctx.mcp.transform((editor) => {
       existing = editor.get("notion");
     });
   } catch (error2) {
-    problems.push(`accounts: the existing MCP configuration could not be read: ${error2 instanceof Error ? error2.message : String(error2)}`);
+    readFailed2 = true;
+    const reason = error2 instanceof Error ? error2.message : String(error2);
+    problems.push(`UNAVAILABLE: The user's notion MCP entry could not be read (${reason}). Next step: Fix or remove mcp.servers.notion, then restart OpenCode.`);
   }
+  if (readFailed2) return { aliases, registered: [], problems };
   let source2;
   if (existing !== void 0) {
     if (existing.type !== "remote") {
@@ -12250,13 +12254,15 @@ async function walkOwn(read, after) {
   const seen = /* @__PURE__ */ new Map();
   const holes = [];
   let cut3 = false;
+  let malformed2 = 0;
   for (const by of AUTHORS) {
     const found = await walk(read, after, by, limit);
     for (const item2 of found.seen.values()) if ((seen.get(item2.id)?.t ?? Number.NEGATIVE_INFINITY) < item2.t) seen.set(item2.id, item2);
     holes.push(...found.holes);
+    malformed2 += found.malformed;
     cut3 ||= found.cut === true || limit.limited;
   }
-  return { seen, holes: joined(holes), ...cut3 ? { cut: cut3 } : {}, ...limit.refusal === void 0 ? {} : { refusal: limit.refusal } };
+  return { seen, holes: joined(holes), malformed: malformed2, ...cut3 ? { cut: cut3 } : {}, ...limit.refusal === void 0 ? {} : { refusal: limit.refusal } };
 }
 var DAY = 24 * HOUR;
 var dateOf = (time3) => new Date(time3).toISOString().slice(0, 10);
@@ -12264,6 +12270,7 @@ var shiftDate = (date5, days) => dateOf(Date.parse(`${date5}T00:00:00Z`) + days 
 async function walk(read, after, by, limit = { limited: false }) {
   const seen = /* @__PURE__ */ new Map();
   const holes = [];
+  let malformed2 = 0;
   const start = dateOf(after.t - BEHIND_UTC);
   let [low, high] = [-BEHIND_UTC, AHEAD_OF_UTC];
   let searches = 0;
@@ -12282,6 +12289,7 @@ async function walk(read, after, by, limit = { limited: false }) {
     };
     try {
       const answer = await read.search(request);
+      malformed2 += answer.malformed ?? 0;
       for (const item2 of answer.items) if ((seen.get(item2.id)?.t ?? Number.NEGATIVE_INFINITY) < item2.t) seen.set(item2.id, item2);
       return answer;
     } catch (error2) {
@@ -12293,7 +12301,7 @@ async function walk(read, after, by, limit = { limited: false }) {
     }
   };
   const oldest = (answer) => answer.items.length > 0 ? answer.items[answer.items.length - 1].t : Number.POSITIVE_INFINITY;
-  const done = () => ({ seen, holes, searches });
+  const done = () => ({ seen, holes, searches, malformed: malformed2 });
   try {
     let answer = await search();
     if (answer.count < SEARCH_PAGE || oldest(answer) < after.t) return done();
@@ -12363,7 +12371,7 @@ async function listEvents(read, account, identity, request, now) {
   const pageIdentity = { source: SOURCE, account, owner: identity.owner };
   const cursorAt = (position2) => encodeBoundCursor(bindingOf(account), { a: account, t: position2.t, i: position2.i });
   if (after.t > end) return eventsListResult(pageIdentity, [], cursorAt(after), false, { plugin: PACKAGE, asOf });
-  const { seen, holes, cut: cut3, refusal: refusal2 } = await walkOwn(read, after);
+  const { seen, holes, cut: cut3, malformed: malformed2, refusal: refusal2 } = await walkOwn(read, after);
   if (cut3 === true && seen.size === 0) throw refusal2 ?? rateLimitedFailure();
   const lost = (t) => holes.some((hole) => t > hole.lo && t < hole.hi);
   const listed = [...seen.values()].filter((edited) => edited.t <= end && !lost(edited.t) && compare({ t: edited.t, i: edited.id }, after) > 0).sort((a, b) => compare({ t: a.t, i: a.id }, { t: b.t, i: b.id }));
@@ -12386,6 +12394,7 @@ async function listEvents(read, account, identity, request, now) {
     region = listed.filter((edited) => edited.t > from && (next === void 0 || edited.t <= next.lo));
     follows = next !== void 0;
   }
+  if (malformed2 > 0 && gap === void 0) gap = { reason: "window-truncated", since: new Date(after.t).toISOString() };
   const chosen = region.slice(0, request.limit);
   const screened = screenEvents(chosen.map((edited) => toEvent(account, edited)));
   const fits = screened.events.length === 0 ? 0 : fitPage(screened.events, request.limit, MAX_BYTES2);
@@ -12629,7 +12638,7 @@ function readFailed(tool, reason) {
   if (limited) {
     return failure3("RATE_LIMITED", `Notion's ${tool} answered rate_limited`, "Wait, then call it again with the same input; make fewer calls at once.", Number.isSafeInteger(seconds) && seconds > 0 ? seconds : void 0);
   }
-  return failure3("UNAVAILABLE", `Notion's ${tool} failed: ${cut2(oneLine2(reason), 200)}`, "Call the method again; if it keeps failing, run /notion status.");
+  return failure3("UNAVAILABLE", `Notion's ${tool} failed: ${cut2(redactReason(reason), 200)}`, "Call the method again; if it keeps failing, run /notion status.");
 }
 function connectionFailure(status, tool, alias) {
   if (status === "needs_auth" || status === "needs_client_registration") {
@@ -12669,18 +12678,28 @@ function readSearch(answer) {
   if (answer["type"] !== void 0 && answer["type"] !== "workspace_search") throw unreadable(`answered a ${String(answer["type"]).slice(0, 40)} search, not a workspace search`);
   if (!Array.isArray(answer["results"])) throw unreadable("answered no results list");
   const items = [];
+  let malformed2 = 0;
   for (const result of answer["results"]) {
-    if (!record3(result)) continue;
+    if (!record3(result)) {
+      malformed2 += 1;
+      continue;
+    }
     const { id, timestamp: timestamp2, type, title } = result;
-    if (typeof id !== "string" || !ID.test(id) || typeof timestamp2 !== "string" || !ISO_WITH_ZONE.test(timestamp2)) continue;
+    if (typeof id !== "string" || !ID.test(id) || typeof timestamp2 !== "string" || !ISO_WITH_ZONE.test(timestamp2)) {
+      malformed2 += 1;
+      continue;
+    }
     const t = Date.parse(timestamp2);
-    if (Number.isNaN(t) || type !== "page" && type !== "database") continue;
+    if (Number.isNaN(t) || type !== "page" && type !== "database") {
+      malformed2 += 1;
+      continue;
+    }
     items.push({ id: id.toLowerCase(), t, type, title: typeof title === "string" ? title : "", url: notionUrl(result["url"]) });
   }
   for (let index = 1; index < items.length; index++) {
     if (items[index].t > items[index - 1].t) throw unreadable("did not list its results by last edit, newest first");
   }
-  return { items, count: answer["results"].length };
+  return { items, count: answer["results"].length, malformed: malformed2 };
 }
 var upstream = (error2) => error2 instanceof Error && error2._tag === "Tool.Error" && error2.error === void 0;
 var permission = (error2) => error2 instanceof Error && error2._tag === "Tool.Error" && error2.error !== void 0;
@@ -12773,11 +12792,6 @@ async function loadSkills(directory = SKILLS_DIR) {
     }
   }
   return { skills, problems };
-}
-function registerSkills(skill, skills) {
-  return skill.transform((editor) => {
-    for (const info of skills) editor.add(info);
-  });
 }
 
 // src/status.ts
@@ -12874,7 +12888,9 @@ var index_default = Plugin.define({
       events_list: eventsHandler(provider, cache2)
     };
     const registration = await register(ctx, manifest, handlers);
-    const skillsRegistration = await registerSkills(ctx.skill, skills);
+    const skillsRegistration = await ctx.skill.transform((editor) => {
+      for (const info of skills) editor.add(info);
+    });
     const level = accessLevel(options);
     const rules = level.ok ? rulesFor(manifest, level.value, accounts.aliases) : [];
     const watched = accounts.aliases.filter(owned);

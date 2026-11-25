@@ -117,6 +117,8 @@ export interface Walk {
   readonly seen: ReadonlyMap<string, Edited>
   readonly holes: readonly Hole[]
   readonly searches: number
+  /** Results this walk could not place in time; the page answers a gap when any were dropped. */
+  readonly malformed: number
   /** True when Notion rate-limited this walk: what it did not reach is unknown, so a page must not pass it. */
   readonly cut?: boolean
 }
@@ -142,18 +144,20 @@ function joined(holes: readonly Hole[]): Hole[] {
 }
 
 /** What the walks for every author filter saw: each page once at its latest edit, every walk's holes, and whether a rate limit ended them. */
-async function walkOwn(read: Pick<NotionReader, "search">, after: Key): Promise<Pick<Walk, "seen" | "holes" | "cut"> & { readonly refusal?: unknown }> {
+async function walkOwn(read: Pick<NotionReader, "search">, after: Key): Promise<Pick<Walk, "seen" | "holes" | "malformed" | "cut"> & { readonly refusal?: unknown }> {
   const limit: SearchLimit = { limited: false }
   const seen = new Map<string, Edited>()
   const holes: Hole[] = []
   let cut = false
+  let malformed = 0
   for (const by of AUTHORS) {
     const found = await walk(read, after, by, limit)
     for (const item of found.seen.values()) if ((seen.get(item.id)?.t ?? Number.NEGATIVE_INFINITY) < item.t) seen.set(item.id, item)
     holes.push(...found.holes)
+    malformed += found.malformed
     cut ||= found.cut === true || limit.limited
   }
-  return { seen, holes: joined(holes), ...(cut ? { cut } : {}), ...(limit.refusal === undefined ? {} : { refusal: limit.refusal }) }
+  return { seen, holes: joined(holes), malformed, ...(cut ? { cut } : {}), ...(limit.refusal === undefined ? {} : { refusal: limit.refusal }) }
 }
 
 const DAY = 24 * HOUR
@@ -177,6 +181,7 @@ const shiftDate = (date: string, days: number) => dateOf(Date.parse(`${date}T00:
 export async function walk(read: Pick<NotionReader, "search">, after: Key, by: Author, limit: SearchLimit = { limited: false }): Promise<Walk> {
   const seen = new Map<string, Edited>()
   const holes: Hole[] = []
+  let malformed = 0
   const start = dateOf(after.t - BEHIND_UTC)
   // Notion's zone, as an offset from UTC: at least `ahead`, at most `behind`, narrowed by each answer.
   let [low, high] = [-BEHIND_UTC, AHEAD_OF_UTC]
@@ -197,6 +202,7 @@ export async function walk(read: Pick<NotionReader, "search">, after: Key, by: A
     }
     try {
       const answer = await read.search(request)
+      malformed += answer.malformed ?? 0
       // A page edited again while the call runs keeps its latest edit.
       for (const item of answer.items) if ((seen.get(item.id)?.t ?? Number.NEGATIVE_INFINITY) < item.t) seen.set(item.id, item)
       return answer
@@ -209,7 +215,7 @@ export async function walk(read: Pick<NotionReader, "search">, after: Key, by: A
     }
   }
   const oldest = (answer: Searched) => (answer.items.length > 0 ? answer.items[answer.items.length - 1]!.t : Number.POSITIVE_INFINITY)
-  const done = () => ({ seen, holes, searches })
+  const done = () => ({ seen, holes, searches, malformed })
 
   try {
     let answer = await search()
@@ -303,7 +309,7 @@ export async function listEvents(read: Pick<NotionReader, "search">, account: st
   const cursorAt = (position: Key) => encodeBoundCursor(bindingOf(account), { a: account, t: position.t, i: position.i })
   if (after.t > end) return eventsListResult(pageIdentity, [], cursorAt(after), false, { plugin: PACKAGE, asOf })
 
-  const { seen, holes, cut, refusal } = await walkOwn(read, after)
+  const { seen, holes, cut, malformed, refusal } = await walkOwn(read, after)
   if (cut === true && seen.size === 0) throw refusal ?? rateLimitedFailure()
   const lost = (t: number) => holes.some((hole) => t > hole.lo && t < hole.hi)
   const listed = [...seen.values()]
@@ -332,6 +338,10 @@ export async function listEvents(read: Pick<NotionReader, "search">, account: st
     region = listed.filter((edited) => edited.t > from && (next === undefined || edited.t <= next.lo))
     follows = next !== undefined
   }
+
+  // A result that could not be placed in time may hide an edit anywhere in the window; answer one gap rather than
+  // pretend the page is complete.
+  if (malformed > 0 && gap === undefined) gap = { reason: "window-truncated", since: new Date(after.t).toISOString() }
 
   const chosen = region.slice(0, request.limit)
   // A page whose title holds a secret is refused for good; the rest fill the page up to its size.

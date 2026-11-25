@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { Skill, type Plugin } from "@opencode/plugin"
+import { Skill } from "@opencode/plugin"
 import { redactReason } from "@we-the-rebel-alliance/plugin-contract/accounts"
 
 /** `skills/` at the package root, next to `dist/` (and next to `src/` in the repository). */
@@ -59,11 +59,4 @@ export async function loadSkills(directory = SKILLS_DIR): Promise<{ skills: Skil
     }
   }
   return { skills, problems }
-}
-
-/** Adds the loaded skills to every location through the host's skill transform. */
-export function registerSkills(skill: Pick<Plugin.Context["skill"], "transform">, skills: readonly Skill.Info[]) {
-  return skill.transform((editor) => {
-    for (const info of skills) editor.add(info)
-  })
 }
