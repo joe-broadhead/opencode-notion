@@ -9,6 +9,7 @@ import { createStatus } from "./handlers/status.ts"
 import { manifest, version } from "./manifest.ts"
 import { identities } from "./provider/identity.ts"
 import { createProvider } from "./provider/notion.ts"
+import { readSkills, registerSkills } from "./skills.ts"
 import { registerStatusCommand } from "./status.ts"
 import { watchAccountStatus } from "./watch.ts"
 
@@ -21,6 +22,8 @@ export default Plugin.define({
   id: manifest.plugin.name,
   async setup(ctx) {
     assertHost(ctx, manifest)
+    // Check every skill before anything registers, so a malformed file fails setup with one clear SCHEMA_VIOLATION.
+    const skills = readSkills()
     const options = ctx.options ?? {}
     const accounts = await registerNotionAccounts(ctx, manifest, options)
     const cache = identities()
@@ -42,6 +45,7 @@ export default Plugin.define({
       events_list: eventsHandler(provider, cache),
     }
     const registration = await register(ctx, manifest, handlers)
+    const skillsRegistration = await registerSkills(ctx, skills)
     const level = accessLevel(options)
     const rules = level.ok ? rulesFor(manifest, level.value, accounts.aliases) : []
     const watched = accounts.aliases.filter(owned)
@@ -58,6 +62,7 @@ export default Plugin.define({
     return async () => {
       await stopWatch()
       await command.dispose().catch(() => undefined)
+      await skillsRegistration.dispose().catch(() => undefined)
       await registration.dispose()
     }
   },

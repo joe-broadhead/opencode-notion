@@ -55,13 +55,18 @@ export async function registerNotionAccounts(
   const problems: string[] = []
 
   let existing: Mcp.ServerConfig | undefined
+  let readFailed = false
   try {
     await ctx.mcp.transform((editor) => {
       existing = editor.get("notion")
     })
   } catch (error) {
-    problems.push(`accounts: the existing MCP configuration could not be read: ${error instanceof Error ? error.message : String(error)}`)
+    readFailed = true
+    const reason = error instanceof Error ? error.message : String(error)
+    problems.push(`UNAVAILABLE: The user's notion MCP entry could not be read (${reason}). Next step: Fix or remove mcp.servers.notion, then restart OpenCode.`)
   }
+  // Fail closed: without knowing whether the person's `notion` entry is theirs, registering over it could replace it.
+  if (readFailed) return { aliases, registered: [], problems }
 
   let source: ServerSource | undefined
   if (existing !== undefined) {

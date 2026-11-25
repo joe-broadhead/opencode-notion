@@ -7,22 +7,25 @@ Read [AGENTS.md](AGENTS.md) first: it lists the repository rules and the layout.
 
 Node.js 24 is required; the real host test uses `@opencode/sdk` 2.4.1, which needs it.
 
+The lockfile records the contract dependency as `git+ssh`, and a runner or a fresh checkout has no key. Rewrite it to HTTPS first:
+
 ```sh
+git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
 npm ci --ignore-scripts
 npm run check
 ```
 
-`npm run check` runs, in order: `biome lint`, `tsc`, the build, `plugin-kit docs --check`, the unit, conformance and
+`npm run check` runs, in order: `biome lint`, `tsc`, the bundle and a `git diff --exit-code dist/`, `plugin-kit docs --check`, the unit, conformance and
 host suites, `plugin-kit check` (T0/T1, the doc file set, forbidden patterns and the bundled-kit check) and the pack
 suite. It stops at the first failure. Run one repository's full check at a time: the host and pack suites bind fixed
 ports.
 
-Shortcuts: `npm run typecheck`, `npm run build`, `npm test`, `npm run test:pack`, `npm run lint`, `npm run docs`.
+Shortcuts: `npm run typecheck`, `npm run bundle`, `npm test`, `npm run test:pack`, `npm run lint`, `npm run docs`.
 
 ## Try it in OpenCode
 
 ```sh
-npm run build
+npm run bundle
 ```
 
 Then list the folder in `plugins`, as an absolute path or a path relative to the config file, and restart OpenCode:
@@ -39,5 +42,6 @@ and `personal`; it holds no real account, page or secret. `RECORD=1 npm test` wr
 
 ## Releases
 
-The lead cuts releases after merge with `npx plugin-kit release 0.0.0`; CI publishes the GitHub release on the tag. Do
-not tag or publish by hand.
+The lead cuts releases after merge with `npx plugin-kit release 0.0.0`; CI publishes the GitHub release on the tag. The
+workflow attaches the package tarball (`*.tgz`, which contains the committed `dist/`), `conformance.json` and
+`SHA256SUMS` with their pinned hashes. Do not tag or publish by hand.

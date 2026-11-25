@@ -1,34 +1,32 @@
-// One self-contained server bundle: `src/index.ts` -> `dist/index.js`.
+// Builds dist/index.js: the one server entry package.json exports, as one self-contained ES module.
 //
-// Only the host module and Node built-ins stay external; the contract library is inlined. A bare import that is
-// neither the host's nor the contract's fails the build, so the published bundle imports nothing else.
-import { rm } from "node:fs/promises"
+//   npm run bundle
+//
+// @opencode/* stays external, because OpenCode provides it at run time. The contract modules are bundled, so a tag
+// installs and runs with no build and no runtime dependency. dist/ is committed, because a tag must install with no
+// build; run `npm run bundle` after a source change, and never edit dist/ by hand.
+import { readFileSync, rmSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { build } from "esbuild"
 
-const HOST = "@opencode/plugin"
-const CONTRACT = "@we-the-rebel-alliance/plugin-contract"
+const root = join(dirname(fileURLToPath(import.meta.url)), "..")
+const dist = join(root, "dist")
+const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"))
 
-await rm("dist", { recursive: true, force: true })
+rmSync(dist, { recursive: true, force: true })
 await build({
-  entryPoints: ["src/index.ts"],
-  outfile: "dist/index.js",
+  entryPoints: [{ in: join(root, "src", "index.ts"), out: "index" }],
+  outdir: dist,
   bundle: true,
-  platform: "node",
   format: "esm",
+  platform: "node",
   target: "node24",
-  sourcemap: false,
-  external: [HOST, "node:*"],
-  plugins: [
-    {
-      name: "host-and-contract-only",
-      setup(builder) {
-        builder.onResolve({ filter: /^[^./]/ }, (args) => {
-          if (args.path.startsWith("node:")) return
-          if (args.path === HOST || args.path.startsWith(`${HOST}/`)) return
-          if (args.path === CONTRACT || args.path.startsWith(`${CONTRACT}/`)) return
-          throw new Error(`the plugin may import only ${HOST}, node: built-ins and the contract, not ${args.path}`)
-        })
-      },
-    },
-  ],
+  external: ["@opencode/*"],
+  legalComments: "none",
+  logLevel: "warning",
+  // The YAML parser is CommonJS and reads `process` with require(); the bundle is ESM, so give it a real require.
+  banner: { js: `import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);\n// ${pkg.name} ${pkg.version}. Built by scripts/build.mjs; do not edit.` },
 })
+
+console.log(`built ${pkg.name} ${pkg.version} into dist/index.js`)

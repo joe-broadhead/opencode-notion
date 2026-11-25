@@ -27,9 +27,9 @@ goes through OpenCode's executor for the alias's MCP server.
 
 | Command | Does |
 |---|---|
-| `npm ci` | installs dev tooling only; there are no runtime dependencies |
-| `npm run check` | the full gate: lint, typecheck, build, docs drift, unit, conformance, host, pack |
-| `npx plugin-kit check` | conformance (T0 and T1), the required doc files, forbidden patterns and the bundled-kit check; it does not typecheck, build or run the unit tests |
+| `npm ci` | installs dev tooling only; there are no runtime dependencies. The lockfile records the contract as `git+ssh`, so run `git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"` first |
+| `npm run check` | the full gate: lint, typecheck, bundle and `dist/` drift, docs drift, unit, conformance, host, pack |
+| `npx plugin-kit check` | conformance (T0 and T1), the required doc files, forbidden patterns and the bundled-kit check; it does not typecheck, bundle or run the unit tests |
 | `npx plugin-kit docs` | regenerates the generated doc sections from the manifest |
 | `npx plugin-kit record` | validates and redacts `fixtures/conformance.json`; it cannot call the plugin's handlers, so `RECORD=1 npm test` writes it |
 | `npx plugin-kit release <version>` | cuts a 0.0.x release; CI publishes the GitHub release on the tag |
@@ -37,13 +37,14 @@ goes through OpenCode's executor for the alias's MCP server.
 ## Layout
 
 ```
-src/index.ts             Plugin.define and setup, in this order: assertHost, accounts, register, command, watcher
+src/index.ts             Plugin.define and setup, in this order: assertHost, accounts, skills, register, command, watcher
 src/manifest.ts          package.json's capabilities and version
 src/accounts.ts          one MCP server per alias; adoption or conflict of the user's own `notion` entry
 src/provider/server.ts   the one Notion MCP URL, the OAuth scope pin and the server config
 src/provider/notion.ts   the provider client and the notion-search answer parser
 src/provider/identity.ts the per-alias identity cache
 src/handlers/            events_list, probe and status, one file each
+src/skills.ts            reads and checks skills/*/SKILL.md as YAML; setup calls registerSkills, which uses ctx.skill.transform
 src/status.ts            the /notion command view
 src/watch.ts             the account bus watcher
 skills/notion/           the main skill
@@ -105,7 +106,7 @@ and `automations`. Hand-written text is plain English: short sentences, one term
 
 ## Forbidden
 
-- Editing `dist/` by hand, or committing it outside a release.
+- `dist/` is committed and regenerated with `npm run bundle`; never edit it by hand.
 - Adding runtime dependencies, peer dependencies or lifecycle scripts.
 - Naming any app in code, manifest or docs, except in an `x-<app>` key.
 - Copying contract code into this repository.

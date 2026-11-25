@@ -1,0 +1,42 @@
+name: Feature request
+description: A capability, a source or a change the Notion plugin should make.
+title: "feat: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A new capability starts in the manifest and needs a handler, tests and a recorded fixture. Read AGENTS.md
+        before you open the pull request.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of capability
+      options:
+        - A read method
+        - A pass-through Notion MCP tool
+        - An events source
+        - An account mechanism
+        - Documentation or layout
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What a person cannot do today with Notion pages, databases or comments, and why the plugin is the right owner.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: The proposal
+      description: The method or source, its class, the Notion operations it needs (`notion-fetch`, `notion-search`, …), and what its answer looks like.
+    validations:
+      required: true
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk and confirmation
+      description: For a write, say what it reaches and how it is confirmed (an OpenCode ask, or an action grant). For a read, say what it reads and whether it should ask, such as the member or private-page reads.
+    validations:
+      required: false

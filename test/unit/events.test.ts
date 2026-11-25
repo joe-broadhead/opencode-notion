@@ -113,6 +113,31 @@ describe("events_list", () => {
     expect(third.events).toEqual([])
   })
 
+  test("answers a malformed search result as a gap and still lists the valid event", async () => {
+    const { handler } = eventsFor({ work: { ...WORKSPACES.work, malformed: true } })
+    const page = (await handler.run({ source: "pages", since: "2026-11-15" }, methodCall("work"))) as {
+      events: { external_id: string }[]
+      gap?: { reason: string; since: string }
+    }
+    expect(page.events.map((event) => event.external_id)).toContain("p-work-1@2026-11-18T10:15:00.000Z")
+    expect(page.gap?.reason).toBe("window-truncated")
+  })
+
+  test("redacts a token-shaped provider reason end to end", async () => {
+    // A token-shaped value built at runtime, so the source carries no credential-shaped literal.
+    const token = ["ghp", "test0123456789abcdef0123456789abcdef"].join("_")
+    const { handler } = eventsFor({ work: { ...WORKSPACES.work, failure: `upstream failed with ${token}` } })
+    try {
+      await handler.run({ source: "pages", since: "2026-11-15" }, methodCall("work"))
+      throw new Error("the read must fail")
+    } catch (error) {
+      const refusal = refusalOf(error)
+      expect(refusal?.code).toBe("UNAVAILABLE")
+      expect(refusal?.message ?? "").not.toContain(token)
+      expect(refusal?.message ?? "").not.toContain("ghp_")
+    }
+  })
+
   test("answers a hole as one gap on the page that passes it, and lists the edits after it", async () => {
     const above = Date.parse("2026-01-10T12:00:00.000Z")
     const older: Edited = { id: "p-old", t: Date.parse("2026-01-09T12:00:00.000Z"), type: "page", title: "Old", url: null }

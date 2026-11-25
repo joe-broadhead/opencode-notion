@@ -22,6 +22,8 @@ export interface FakeWorkspace {
   readonly status?: "connected" | "needs_auth" | "needs_client_registration" | "pending" | "failed" | "disabled"
   /** A message for `notion-search`; the fake answers it as Notion's own failure. */
   readonly failure?: string
+  /** Add one result that cannot be placed in time, to prove the page's gap. */
+  readonly malformed?: boolean
 }
 
 export interface FakeOptions {
@@ -99,7 +101,7 @@ export function createFakeTools(options: FakeOptions): FakeTools {
         const edited = Array.isArray(filters["edited_by_user_ids"]) && filters["edited_by_user_ids"].includes("me")
         const created = Array.isArray(filters["created_by_user_ids"]) && filters["created_by_user_ids"].includes("me")
         const author = edited ? "edited_by" : created ? "created_by" : undefined
-        const listed = workspace.pages
+        const listed: Record<string, unknown>[] = workspace.pages
           .filter((page) => (author === undefined ? false : page[author] === workspace.user.id))
           .filter((page) => dayOf(page.edited_at) >= start && (end === undefined || dayOf(page.edited_at) <= end))
           .sort((left, right) => right.edited_at.localeCompare(left.edited_at))
@@ -112,6 +114,7 @@ export function createFakeTools(options: FakeOptions): FakeTools {
             url: page.url ?? null,
             timestamp: page.edited_at,
           }))
+        if (workspace.malformed === true) listed.push({ object: "page", id: "not-a-page-id", timestamp: "not-a-time" })
         if (workspace.plan === "free") {
           return { output: { type: "workspace_search", notices: ["The sort option was omitted on this plan."], results: listed } }
         }

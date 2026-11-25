@@ -80,7 +80,7 @@ async function recorded() {
       "Recorded from the plugin's own handlers over a fake OpenCode MCP boundary: two synthetic aliases, invented workspaces, pages and people, and no secret. RECORD=1 writes it.",
     plugin: PACKAGE,
     accounts: {
-      real: true,
+      real: false,
       aliases: [...aliases],
       required: { method: "events_list", code: "ACCOUNT_REQUIRED" },
       unknown: { method: "events_list", account: "nobodyhere", code: "ACCOUNT_UNKNOWN" },
@@ -89,9 +89,9 @@ async function recorded() {
     sources: {
       "notion.pages": {
         cases: [
-          { name: "the work account", input: { source: "pages", since: "2026-11-15" }, expect: "page", answer: workPage },
-          { name: "the personal account", input: { source: "pages", since: "2026-11-15" }, expect: "page", answer: personalPage },
-          { name: "an empty window", input: { source: "pages", since: "2026-11-20T00:00:00Z" }, expect: "empty", answer: emptyPage },
+          { case: "the work account", input: { source: "pages", since: "2026-11-15" }, expect: "page", answer: workPage },
+          { case: "the personal account", input: { source: "pages", since: "2026-11-15" }, expect: "page", answer: personalPage },
+          { case: "an empty window", input: { source: "pages", since: "2026-11-20T00:00:00Z" }, expect: "empty", answer: emptyPage },
         ],
         probe: { answer: probeWork },
       },

@@ -65,6 +65,28 @@ describe("account registration and the user's own notion entry", () => {
     expect(fake.sets).toEqual([])
   })
 
+  test("fails closed when the person's notion entry cannot be read", async () => {
+    const sets: [string, unknown][] = []
+    let transforms = 0
+    const ctx = {
+      mcp: {
+        transform: async () => {
+          transforms += 1
+          throw new Error("the MCP configuration is unreadable")
+        },
+      },
+      integration: {
+        transform: async () => ({ dispose: async () => {} }),
+      },
+    }
+    const result = await registerNotionAccounts(ctx as never, manifest, {})
+    expect(result.registered).toEqual([])
+    expect(result.problems[0]).toContain("UNAVAILABLE")
+    expect(result.problems[0]).toContain("mcp.servers.notion")
+    expect(transforms).toBe(1)
+    expect(sets).toEqual([])
+  })
+
   test("registers one server per alias, and only the non-default aliases when notion is adopted", async () => {
     const fake = fakeContext()
     const options = { accounts: { work: {}, personal: {} } }

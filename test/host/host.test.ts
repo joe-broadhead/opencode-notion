@@ -7,7 +7,7 @@ const root = join(import.meta.dirname, "..", "..")
 
 describe("the built plugin on the real OpenCode 2.4.1 host", () => {
   test("registers two aliases, refuses a missing and an unknown account, and answers status", async () => {
-    expect(existsSync(join(root, "dist", "index.js")), "run npm run build before the host test").toBe(true)
+    expect(existsSync(join(root, "dist", "index.js")), "run npm run bundle before the host test").toBe(true)
     const run = await createHost({
       directory: root,
       version: "2.4.1",
