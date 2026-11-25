@@ -37,13 +37,14 @@ goes through OpenCode's executor for the alias's MCP server.
 ## Layout
 
 ```
-src/index.ts             Plugin.define and setup, in this order: assertHost, accounts, register, command, watcher
+src/index.ts             Plugin.define and setup, in this order: assertHost, accounts, skills, register, command, watcher
 src/manifest.ts          package.json's capabilities and version
 src/accounts.ts          one MCP server per alias; adoption or conflict of the user's own `notion` entry
 src/provider/server.ts   the one Notion MCP URL, the OAuth scope pin and the server config
 src/provider/notion.ts   the provider client and the notion-search answer parser
 src/provider/identity.ts the per-alias identity cache
 src/handlers/            events_list, probe and status, one file each
+src/skills.ts            reads skills/*/SKILL.md and registers them through ctx.skill
 src/status.ts            the /notion command view
 src/watch.ts             the account bus watcher
 skills/notion/           the main skill

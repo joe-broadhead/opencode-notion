@@ -10999,8 +10999,8 @@ var StrictJsonError = class extends Error {
 var NUMBER = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/;
 function strictJson(text2, what) {
   let index = 0;
-  const fail = (detail2) => {
-    throw new StrictJsonError(`${what} ${detail2}`);
+  const fail = (detail3) => {
+    throw new StrictJsonError(`${what} ${detail3}`);
   };
   const duplicate = () => {
     throw new StrictJsonError(`${what} holds a duplicate key`);
@@ -12480,8 +12480,8 @@ async function signalsOf(deps) {
     } else if (status === "needs_auth") {
       signals[alias] = { state: "needs_sign_in", ...owner === void 0 ? {} : { owner } };
     } else {
-      const detail2 = "error" in server.status && typeof server.status.error === "string" ? server.status.error : void 0;
-      const reason = detail2 === void 0 ? `${name} is ${status}` : `${name}: ${detail2}`;
+      const detail3 = "error" in server.status && typeof server.status.error === "string" ? server.status.error : void 0;
+      const reason = detail3 === void 0 ? `${name} is ${status}` : `${name}: ${detail3}`;
       signals[alias] = { state: "error", reason, ...owner === void 0 ? {} : { owner } };
     }
   }
@@ -12725,6 +12725,61 @@ function createProvider(options) {
   };
 }
 
+// src/skills.ts
+import { readFile } from "node:fs/promises";
+import { join as join2 } from "node:path";
+import { fileURLToPath } from "node:url";
+import { Skill } from "@opencode/plugin";
+var SKILLS_DIR = fileURLToPath(new URL("../skills/", import.meta.url));
+var SKILL_NAMES = ["notion", "notion-write"];
+var detail2 = (problem, name) => `The "${name}" skill was not loaded: skills/${name}/SKILL.md ${problem}`;
+var problemOf = (name, value) => `UNAVAILABLE: ${detail2(value, name)}. Next step: Reinstall the plugin.`;
+function parseSkill(name, path, text2) {
+  const fail = (problem) => {
+    throw new Error(detail2(problem, name));
+  };
+  const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(text2.replace(/\r\n/g, "\n"));
+  if (!match) fail("has no frontmatter");
+  const fields = new Map(
+    match[1].split("\n").map((line) => {
+      const colon = line.indexOf(":");
+      return [colon < 0 ? line.trim() : line.slice(0, colon).trim(), colon < 0 ? "" : line.slice(colon + 1).trim().replace(/^(["'])(.*)\1$/, "$2")];
+    })
+  );
+  if (fields.get("name") !== name) fail(`must be named "${name}" in its frontmatter`);
+  const description = fields.get("description");
+  if (description === void 0 || description.trim() === "") fail("has no description");
+  const content = match[2].trim();
+  if (content === "") fail("has no body");
+  return {
+    id: Skill.ID.make(name),
+    name: Skill.Name.make(name),
+    description,
+    path: Skill.Info.fields.path.make(path),
+    content
+  };
+}
+async function loadSkills(directory = SKILLS_DIR) {
+  const skills = [];
+  const problems = [];
+  for (const name of SKILL_NAMES) {
+    const path = join2(directory, name, "SKILL.md");
+    try {
+      skills.push(parseSkill(name, path, await readFile(path, "utf8")));
+    } catch (error2) {
+      const code = error2.code;
+      const reason = code === "ENOENT" ? "is missing" : redactReason(error2 instanceof Error ? error2.message : String(error2)).slice(0, 160);
+      problems.push(problemOf(name, reason));
+    }
+  }
+  return { skills, problems };
+}
+function registerSkills(skill, skills) {
+  return skill.transform((editor) => {
+    for (const info of skills) editor.add(info);
+  });
+}
+
 // src/status.ts
 function registerStatusCommand(ctx, read) {
   return ctx.command.transform(
@@ -12799,10 +12854,11 @@ var index_default = Plugin.define({
     assertHost(ctx, manifest);
     const options = ctx.options ?? {};
     const accounts = await registerNotionAccounts(ctx, manifest, options);
+    const { skills, problems: skillProblems } = await loadSkills();
     const cache2 = identities();
     const owned = (alias) => !(alias === "default" && accounts.source?.type === "conflict");
     const provider = createProvider({ tool: ctx.tool, mcp: ctx.mcp, owned });
-    const problems = [...accounts.problems, ...accounts.source?.type === "conflict" ? [conflictProblem(accounts.source)] : []];
+    const problems = [...accounts.problems, ...accounts.source?.type === "conflict" ? [conflictProblem(accounts.source)] : [], ...skillProblems];
     const status = createStatus({
       manifest,
       version: version2,
@@ -12818,6 +12874,7 @@ var index_default = Plugin.define({
       events_list: eventsHandler(provider, cache2)
     };
     const registration = await register(ctx, manifest, handlers);
+    const skillsRegistration = await registerSkills(ctx.skill, skills);
     const level = accessLevel(options);
     const rules = level.ok ? rulesFor(manifest, level.value, accounts.aliases) : [];
     const watched = accounts.aliases.filter(owned);
@@ -12834,6 +12891,7 @@ var index_default = Plugin.define({
     return async () => {
       await stopWatch();
       await command.dispose().catch(() => void 0);
+      await skillsRegistration.dispose().catch(() => void 0);
       await registration.dispose();
     };
   }
