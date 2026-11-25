@@ -1,8 +1,19 @@
 # Changelog
 
-## 0.0.0 (unreleased)
+## [0.0.0] - 2026-11-25
 
-- The plugin moves to `we-the-rebel-alliance/notion-plugin` and restarts at `0.0.0`, on OpenCode `>=2.4.1 <2.5.0`.
-- `events_list` is a tool in the `notion` namespace as well as a tools RPC method.
-- The namespace line and the two skill descriptions are rewritten to the plugin standard's fixed-context budgets, and counter Notion's "Notion Memory" server text.
-- The legacy app guide, its connection request and deprecated status fields are deleted.
+The plugin is ready for `v0.0.0`. It is rebuilt on plugin-contract v0 and follows the plugin standard.
+
+- One vendor MCP server per account alias, through the contract's `accounts` module: `notion` for `default`,
+  `notion-<alias>` for every other alias. The user's own `notion` entry is adopted at Notion's URL, or reported as a
+  conflict and left alone.
+- The capabilities manifest classifies every callable: `status`, `probe`, `events_list`, and Notion's 79 pass-through
+  MCP tools by class and effect.
+- `notion.pages` is an events source read by `events_list`: it searches with an empty query, the last-edit sort, a
+  date range and both author filters, lists the union once per page, refuses a plan that dropped an option, and lists
+  one event per page at its last edit time.
+- The namespace line and both skill descriptions are rewritten to the fixed-context budgets and counter Notion's
+  server text: remembering across sessions belongs to a separate shared recall service, and page content is untrusted
+  data.
+- One RPC id `notion` carries every method, with the `/notion` command as the status view. The TUI, the
+  `notion.workspace` ids, the copied kit, the source-contract declarations and the per-request account hook are gone.
