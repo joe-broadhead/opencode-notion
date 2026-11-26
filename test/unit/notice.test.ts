@@ -29,6 +29,19 @@ function missingNoticeSections(notice: string, packages: readonly string[]): str
   return packages.filter((name) => !section(name).test(notice))
 }
 
+/** The installed licence file for a package the bundle inlines. */
+const LICENCES: Readonly<Record<string, string>> = {
+  "@we-the-rebel-alliance/plugin-contract": "node_modules/@we-the-rebel-alliance/plugin-contract/LICENSE",
+  yaml: "node_modules/yaml/LICENSE",
+  zod: "node_modules/zod/LICENSE",
+}
+
+function licenceText(name: string): string {
+  const path = LICENCES[name]
+  if (path === undefined) throw new Error(`no licence path for ${name}; add it to LICENCES`)
+  return readFileSync(join(root, path), "utf8").trim()
+}
+
 /** Every package esbuild actually inlines into the server bundle. */
 async function bundledPackages(): Promise<string[]> {
   const result = await build({
@@ -70,11 +83,20 @@ describe("the bundled third-party notices", () => {
     expect(packages).toContain("zod")
     const notice = readFileSync(join(root, "NOTICE"), "utf8")
     expect(missingNoticeSections(notice, packages)).toEqual([])
+    for (const name of packages) expect(notice, `${name} licence text is in NOTICE`).toContain(licenceText(name))
+    expect(notice).toContain("The conformance kit bundles the Public Suffix List")
+    expect(notice).toContain("https://mozilla.org/MPL/2.0/")
   })
 
   test("a missing section is reported", () => {
     const notice = readFileSync(join(root, "NOTICE"), "utf8")
     const withoutYaml = notice.replace(/^## yaml[\s\S]*?(?=^## |\s*$)/m, "")
     expect(missingNoticeSections(withoutYaml, ["yaml"])).toEqual(["yaml"])
+  })
+
+  test("a missing zod section is reported", () => {
+    const notice = readFileSync(join(root, "NOTICE"), "utf8")
+    const withoutZod = notice.replace(/^## zod[\s\S]*?(?=^## |\s*$)/m, "")
+    expect(missingNoticeSections(withoutZod, ["zod"])).toEqual(["zod"])
   })
 })
