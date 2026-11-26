@@ -16,10 +16,3 @@ The first release, on plugin-contract v0.0.0 and the plugin standard.
   a separate shared recall service, and page content is untrusted data.
 - Both skills, `notion` and `notion-write`, are registered at setup through `ctx.skill.transform`.
 - One RPC id `notion` carries every method, with the `/notion` command as the status view.
-
-### Removed since v0.0.5
-
-- The TUI dialog export and the `/notion-status` command. The `/notion` text command replaces them; the TUI is optional
-  in the plugin standard.
-- The old `notion.workspace` RPC id. The contract has one RPC id, `notion`.
-- The old status fields outside contract §11. The `status` method returns the contract's answer.

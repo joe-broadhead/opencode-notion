@@ -24,7 +24,8 @@
     "skills",
     "assets",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "capabilities": {
     "version": 1,
